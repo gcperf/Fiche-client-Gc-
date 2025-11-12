@@ -3,40 +3,83 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GC Perf — Test Firebase Config</title>
-<!-- Firebase compat (plus simple pour tester) -->
+<title>GC Perf — Auth Test</title>
+<!-- Firebase compat pour simplicité -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
-body{font-family:system-ui;padding:20px;background:#0b0f16;color:#e5e7eb}
-.ok{color:#22c55e} .err{color:#ef4444;white-space:pre-wrap}
-pre{background:#111827;padding:12px;border-radius:8px;overflow:auto}
+body{font-family:system-ui;margin:0;background:#0b0f16;color:#e5e7eb;display:grid;place-items:center;min-height:100vh}
+.card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:20px;min-width:320px}
+input,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #23303a;background:#071018;color:#e5e7eb}
+button.primary{background:#ef233c;border-color:#b91c1c}
+pre{background:#111827;padding:10px;border-radius:8px;overflow:auto;max-height:220px}
+.small{font-size:12px;color:#9aa3b2}
 </style>
 </head>
 <body>
-<h1>Test Firebase Config</h1>
-<div id="out">Initialisation…</div>
-<pre id="cfg"></pre>
+<div class="card">
+  <h2>Test Auth Firebase</h2>
+  <div class="small" id="scope"></div>
+  <input id="email" type="email" placeholder="Email">
+  <input id="pass" type="password" placeholder="Mot de passe">
+  <button class="primary" onclick="doSignIn()">Se connecter</button>
+  <button onclick="doSignUp()">Créer cet utilisateur</button>
+  <button onclick="doLogout()">Se déconnecter</button>
+  <pre id="log"></pre>
+</div>
+
 <script>
+document.getElementById('scope').textContent = 'URL actuelle : ' + location.href;
+
 const firebaseConfig = {
-  apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA", // ← CLÉ CORRECTE (sans le 5)
+  apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA",
   authDomain: "fiche-client-24512.firebaseapp.com",
   projectId: "fiche-client-24512",
-  storageBucket: "fiche-client-24512.appspot.com", // IMPORTANT: .appspot.com
+  storageBucket: "fiche-client-24512.appspot.com",
   messagingSenderId: "808061975050",
   appId: "1:808061975050:web:0a0c7753d3c32438c2fdf3",
   measurementId: "G-3ZHE8T2XJM"
 };
-document.getElementById('cfg').textContent = JSON.stringify(firebaseConfig, null, 2);
+
+function log(...args){ const p=document.getElementById('log'); p.textContent += args.join(' ') + '\n'; console.log(...args); }
 
 try{
-  const app = firebase.initializeApp(firebaseConfig);
-  document.getElementById('out').innerHTML = "✅ Initialisation Firebase OK";
-  console.log("App options:", app.options);
+  firebase.initializeApp(firebaseConfig);
+  log('✅ Firebase init OK');
 }catch(e){
-  console.error(e);
-  document.getElementById('out').innerHTML = "❌ Erreur initialisation";
-  const p=document.createElement('div'); p.className='err'; p.textContent = (e.message||e);
-  document.body.appendChild(p);
+  log('❌ Firebase init ERROR:', e.message||e);
+}
+
+const auth = firebase.auth();
+
+auth.onAuthStateChanged(u=>{
+  if(u) log('👤 Connecté :', u.email,'(uid:',u.uid,')');
+  else log('🚪 Déconnecté');
+});
+
+async function doSignIn(){
+  const email=(document.getElementById('email').value||'').trim();
+  const pass =document.getElementById('pass').value||'';
+  if(!email||!pass){ return log('⚠️ Email + mot de passe requis'); }
+  try{
+    const r=await auth.signInWithEmailAndPassword(email,pass);
+    log('✅ SignIn OK :', r.user.email);
+  }catch(e){ log('❌ SignIn ERROR:', e.code||e.message); }
+}
+
+async function doSignUp(){
+  const email=(document.getElementById('email').value||'').trim();
+  const pass =document.getElementById('pass').value||'';
+  if(!email||!pass){ return log('⚠️ Email + mot de passe requis'); }
+  try{
+    const r=await auth.createUserWithEmailAndPassword(email,pass);
+    log('✅ SignUp OK :', r.user.email);
+  }catch(e){ log('❌ SignUp ERROR:', e.code||e.message); }
+}
+
+async function doLogout(){
+  try{ await auth.signOut(); log('✅ SignOut OK'); }
+  catch(e){ log('❌ SignOut ERROR:', e.code||e.message); }
 }
 </script>
 </body>
