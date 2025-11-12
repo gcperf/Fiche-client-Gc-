@@ -1,9 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /fiches/{id} {
-      allow read: if true;
-      allow create, update, delete: if request.auth != null;
+
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.admin == true;
+    }
+
+    match /fiches/{ficheId} {
+      allow get, list: if true; // lecture publique
+      allow create: if isSignedIn(); // création connectés
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.createdBy); // propre fiche ou admin
+      allow delete: if isAdmin(); // suppression admin
+    }
+
+    match /roles/{uid} {
+      allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update, delete: if false; // géré depuis la console
     }
   }
 }
