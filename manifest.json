@@ -1,12 +1,21 @@
 {
-  "name": "GC Perf — Fiches véhicules",
+  "name": "GC Perf",
   "short_name": "GC Perf",
-  "start_url": "index.html",
+  "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#0b0f16",
   "theme_color": "#ef233c",
+  "description": "Application GC Perf pour la gestion des fiches véhicules (sablage, thermolaquage, entretien)",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Car_icon_red.svg/192px-Car_icon_red.svg.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Car_icon_red.svg/512px-Car_icon_red.svg.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
