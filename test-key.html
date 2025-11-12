@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GC Perf — Test Firebase Config</title>
+<!-- Firebase compat (plus simple pour tester) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<style>
+body{font-family:system-ui;padding:20px;background:#0b0f16;color:#e5e7eb}
+.ok{color:#22c55e} .err{color:#ef4444;white-space:pre-wrap}
+pre{background:#111827;padding:12px;border-radius:8px;overflow:auto}
+</style>
+</head>
+<body>
+<h1>Test Firebase Config</h1>
+<div id="out">Initialisation…</div>
+<pre id="cfg"></pre>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA", // ← CLÉ CORRECTE (sans le 5)
+  authDomain: "fiche-client-24512.firebaseapp.com",
+  projectId: "fiche-client-24512",
+  storageBucket: "fiche-client-24512.appspot.com", // IMPORTANT: .appspot.com
+  messagingSenderId: "808061975050",
+  appId: "1:808061975050:web:0a0c7753d3c32438c2fdf3",
+  measurementId: "G-3ZHE8T2XJM"
+};
+document.getElementById('cfg').textContent = JSON.stringify(firebaseConfig, null, 2);
+
+try{
+  const app = firebase.initializeApp(firebaseConfig);
+  document.getElementById('out').innerHTML = "✅ Initialisation Firebase OK";
+  console.log("App options:", app.options);
+}catch(e){
+  console.error(e);
+  document.getElementById('out').innerHTML = "❌ Erreur initialisation";
+  const p=document.createElement('div'); p.className='err'; p.textContent = (e.message||e);
+  document.body.appendChild(p);
+}
+</script>
+</body>
+</html>
