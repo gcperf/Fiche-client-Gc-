@@ -3,400 +3,119 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fiche de contrôles – Garage</title>
+<title>GC Garage – Fiche de contrôles</title>
+<link rel="manifest" href="manifest.json">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js');
+  });
+}
+</script>
 <style>
-  /* ---- Fond carbone ---- */
-  html,body{height:100%}
-  body{
-    margin:0; color:#e5e7eb; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
-    background:
-      linear-gradient(45deg,rgba(0,0,0,.35) 25%,rgba(0,0,0,0) 25%,rgba(0,0,0,0) 75%,rgba(0,0,0,.35) 75%),
-      linear-gradient(45deg,rgba(0,0,0,.35) 25%,rgba(0,0,0,0) 25%,rgba(0,0,0,0) 75%,rgba(0,0,0,.35) 75%);
-    background-color:#0b0f16;
-    background-size:22px 22px; background-position:0 0,11px 11px;
-  }
-  /* ---- Palette ---- */
-  :root{
-    --red:#ef233c; /* rouge vif */
-    --red-2:#b91c1c;
-    --panel:#0f172aef;
-    --stroke:#1f2937;
-    --muted:#9aa3b2;
-    --radius:14px;
-  }
-  /* ---- Layout ---- */
-  header{position:sticky; top:0; z-index:5; padding:14px 16px; background:linear-gradient(180deg,#111827ee,#0b1220cc); border-bottom:1px solid #1f2937}
-  header .title{display:flex;align-items:center;gap:12px}
-  header .title h1{margin:0;font-size:18px;letter-spacing:.3px}
-  header .badge{background:var(--red);border-radius:999px;padding:4px 10px;font-size:12px}
-  main{max-width:1100px;margin:16px auto;padding:0 16px 60px}
-  .card{background:var(--panel); border:1px solid var(--stroke); border-radius:var(--radius); padding:16px; margin-top:14px}
-  .grid{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  label{font-size:12px; color:var(--muted); margin-bottom:6px; display:block}
-  input,select,textarea,button{
-    width:100%; padding:10px 12px; border-radius:10px; border:1px solid #2a3442; background:#0b1220; color:#e5e7eb;
-  }
-  textarea{min-height:84px; resize:vertical}
-  input::placeholder,textarea::placeholder{color:#6b7280}
-  .toolbar{display:flex; gap:10px; flex-wrap:wrap}
-  button{cursor:pointer}
-  button.primary{background:var(--red); border-color:var(--red-2); font-weight:600}
-  button.ghost{background:transparent}
-  button.warn{background:#7c2d12; border-color:#9a3412}
-  .section{margin-top:8px; border:1px solid #293241; border-radius:12px; overflow:hidden}
-  .section > .head{background:linear-gradient(90deg,rgba(239,35,60,.18),transparent); padding:10px 12px; display:flex; align-items:center; justify-content:space-between}
-  .section h3{margin:0;font-size:14px; letter-spacing:.3px}
-  .mini-tools{display:flex; gap:8px}
-  .mini{font-size:12px; padding:6px 8px; border-radius:999px; border:1px solid #374151}
-  table{width:100%; border-collapse:collapse}
-  th,td{border-top:1px solid #273142; padding:8px 10px; text-align:left}
-  th{font-size:12px; color:#cbd5e1; background:#0e1626}
-  td small{color:#9aa3b2}
-  .muted{color:var(--muted); font-size:12px}
-  .right{display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap}
-  .qty{width:90px}
-  .narrow{max-width:160px}
-  .number{width:120px}
-  .danger{color:#fecaca}
-  .ok{color:#bbf7d0}
-  .chip{display:inline-block; padding:2px 8px; border:1px solid #3b4252; border-radius:999px; font-size:11px}
-  .row{display:flex; gap:12px; flex-wrap:wrap}
-
-  /* ---- Print (PDF) ---- */
-  @media print{
-    body{background:#fff !important}
-    header,.toolbar-global{display:none !important}
-    .card{background:#fff; color:#000; border-color:#d1d5db}
-    th,td{border-color:#e5e7eb; color:#000}
-    .section > .head{background:#fff}
-    .muted{color:#444}
-  }
+html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;color:#e5e7eb;background:linear-gradient(45deg,rgba(0,0,0,.35)25%,rgba(0,0,0,0)25%,rgba(0,0,0,0)75%,rgba(0,0,0,.35)75%),linear-gradient(45deg,rgba(0,0,0,.35)25%,rgba(0,0,0,0)25%,rgba(0,0,0,0)75%,rgba(0,0,0,.35)75%);background-color:#0b0f16;background-size:22px 22px;background-position:0 0,11px 11px}
+:root{--red:#ef233c;--dark:#0f172a;--panel:#0f172aef;--stroke:#1f2937}
+header{padding:10px 16px;background:linear-gradient(180deg,#111827ee,#0b1220cc);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1f2937}
+h1{margin:0;font-size:18px;color:#fff;letter-spacing:.3px}
+#logoImg{height:46px;border-radius:8px;background:#0b1220;padding:4px;border:1px solid #243041;display:none}
+main{max-width:1100px;margin:16px auto;padding:0 16px 60px}
+.card{background:var(--panel);border:1px solid var(--stroke);border-radius:12px;padding:16px;margin-top:14px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+label{font-size:12px;color:#9aa3b2;margin-bottom:6px;display:block}
+input,textarea,button{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2a3442;background:#0b1220;color:#e5e7eb}
+textarea{min-height:84px;resize:vertical}
+button{cursor:pointer}
+button.primary{background:var(--red);border-color:#b91c1c;font-weight:600}
+button.warn{background:#7c2d12;border-color:#9a3412}
+.section{margin-top:8px;border:1px solid #293241;border-radius:12px;overflow:hidden}
+.section>.head{background:linear-gradient(90deg,rgba(239,35,60,.18),transparent);padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
+.section h3{margin:0;font-size:14px;letter-spacing:.3px}
+table{width:100%;border-collapse:collapse}
+th,td{border-top:1px solid #273142;padding:8px 10px;text-align:left}
+th{font-size:12px;color:#cbd5e1;background:#0e1626}
+@media print{body{background:#fff;color:#000}header,button{display:none}#logoImg{display:inline-block !important}}
 </style>
 </head>
 <body>
 <header>
-  <div class="title">
-    <span class="badge">GARAGE</span>
-    <h1>Fiche de contrôles & pièces</h1>
+  <div style="display:flex;align-items:center;gap:12px">
+    <img id="logoImg" alt="Logo GC Garage">
+    <h1>GC Garage — Fiche de contrôles</h1>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <label for="logoFile" style="font-size:12px;cursor:pointer;color:#93c5fd">Importer logo</label>
+    <input id="logoFile" type="file" accept="image/*" style="display:none">
+    <button id="clearLogoBtn" style="font-size:12px">Effacer</button>
   </div>
 </header>
 
 <main>
-  <!-- Identité -->
   <div class="card">
     <div class="grid">
       <div><label>Nom / Société</label><input id="clientName" placeholder="Client"></div>
-      <div><label>Email</label><input id="clientEmail" inputmode="email" placeholder="client@mail.fr"></div>
-      <div><label>Véhicule (marque / modèle)</label><input id="vehicule" placeholder="Ex. Peugeot 308"></div>
+      <div><label>Email</label><input id="clientEmail" placeholder="client@mail.fr"></div>
+      <div><label>Véhicule</label><input id="vehicule" placeholder="Marque / Modèle"></div>
       <div><label>Immatriculation</label><input id="immat" placeholder="AA-123-BB"></div>
-      <div><label>Kilométrage (km)</label><input id="km" class="number" type="number" min="0" step="1" placeholder="128450"></div>
+      <div><label>Kilométrage</label><input id="km" type="number" placeholder="128450"></div>
       <div><label>Date</label><input id="date" type="date"></div>
-      <div><label>Opérateur</label><input id="operateur" placeholder="Prénom"></div>
     </div>
-
-    <div class="toolbar" style="margin-top:12px">
-      <button class="primary" id="saveBtn">Enregistrer (par immat)</button>
-      <button class="ghost" id="newBtn">Nouveau</button>
-      <div class="row">
-        <input id="searchImmat" class="narrow" placeholder="Rechercher immat">
-        <button id="searchBtn">Charger</button>
-      </div>
-      <div class="right" style="flex:1">
-        <button id="printBtn">Exporter PDF</button>
-        <button id="backupBtn">Sauvegarder JSON</button>
-        <label for="restoreFile" class="mini" style="cursor:pointer">Restaurer JSON</label>
-        <input id="restoreFile" type="file" accept=".json" style="display:none">
-      </div>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="primary" id="saveBtn">Enregistrer</button>
+      <button id="newBtn">Nouveau</button>
+      <input id="searchImmat" placeholder="Rechercher immat" style="max-width:160px">
+      <button id="searchBtn">Charger</button>
+      <button id="printBtn">PDF</button>
     </div>
   </div>
 
-  <!-- Fiche de contrôles -->
   <div class="card">
-    <h2 style="margin:0 0 8px 0; color:#fff">FICHE DE CONTRÔLES</h2>
-
-    <!-- Helper fonctionnelle -->
-    <div class="muted">Clique une option par ligne : <span class="ok">Bon</span> / <span class="danger">À remettre en état</span>. Double-clic pour vider.</div>
-
-    <!-- Sections -->
+    <h2 style="margin:0 0 8px;color:#fff">FICHE DE CONTRÔLES</h2>
     <div id="sections"></div>
-
     <div class="section" style="margin-top:14px">
       <div class="head"><h3>Observations</h3></div>
       <div style="padding:10px">
-        <textarea id="observations" placeholder="Remarques générales, essais, états particuliers..."></textarea>
+        <textarea id="observations" placeholder="Remarques générales..."></textarea>
       </div>
     </div>
   </div>
 
-  <!-- Pièces prises -->
   <div class="card">
-    <div class="row" style="align-items:center;justify-content:space-between">
-      <h2 style="margin:0;color:#fff">PIÈCES PRISES & RÉFÉRENCES</h2>
-      <div class="right">
-        <button id="addPart">+ Ajouter une pièce</button>
-        <button class="warn" id="clearParts">Vider la liste</button>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0;color:#fff">Pièces prises / référencées</h2>
+      <div>
+        <button id="addPart">+ Ajouter</button>
+        <button class="warn" id="clearParts">Vider</button>
       </div>
     </div>
     <div class="section" style="margin-top:8px">
       <table id="partsTable">
-        <thead>
-          <tr>
-            <th style="width:16ch">Référence</th>
-            <th>Désignation</th>
-            <th style="width:10ch">Qté</th>
-            <th style="width:12ch">Action</th>
-          </tr>
-        </thead>
-        <tbody id="partsBody">
-          <!-- lignes dynamiques -->
-        </tbody>
+        <thead><tr><th>Référence</th><th>Désignation</th><th>Qté</th><th>Action</th></tr></thead>
+        <tbody id="partsBody"></tbody>
       </table>
     </div>
-    <p class="muted">Astuce : tu peux scanner une ref puis compléter la désignation. Les pièces sont enregistrées avec la fiche du véhicule.</p>
-  </div>
-
-  <div class="toolbar-global" style="position:fixed;right:16px;bottom:16px;display:flex;gap:10px">
-    <button class="primary" id="saveBtn2">Enregistrer</button>
-    <button id="printBtn2">PDF</button>
   </div>
 </main>
 
 <script>
-/* ---------- Modèle des sections de contrôle ---------- */
-const CATEGORIES = [
-  ["VISIBILITÉ", [
-    "Balais d’essuie-glace AV/AR", "Pare-brise (état)", "Rétroviseurs"
-  ]],
-  ["IDENTIFICATION DU VÉHICULE", [
-    "Plaques d’immatriculation (fixation/AV-AR/visibilité)"
-  ]],
-  ["ÉCLAIRAGE", [
-    "Feux de position", "Feux de croisement", "Feux de route",
-    "Feux stop", "Antibrouillard AV/AR", "Clignotants", "Feux de détresse"
-  ]],
-  ["VÉRIFICATION DES NIVEAUX", [
-    "Lave-glace", "Refroidissement", "Liquide de frein", "Huile moteur"
-  ]],
-  ["FREINAGE", [
-    "Disques AV (sans dépose)", "Assistance de freinage", "Témoin niveau de frein"
-  ]],
-  ["DIRECTION", [
-    "Système d’assistance", "Volant / jeu"
-  ]],
-  ["AMORTISSEURS", [
-    "État des amortisseurs"
-  ]],
-  ["AUTRES", [
-    "Échappement & fixations", "Liquide direction assistée", "Avertisseur sonore"
-  ]],
-  ["ÉQUIPEMENTS", [
-    "Support roue de secours", "Ceintures de sécurité"
-  ]],
-  ["PNEUMATIQUES", [
-    "Pression (4 roues + RS)", "État des pneumatiques"
-  ]]
-];
-
-/* ---------- UI builders ---------- */
-const $ = (s)=>document.querySelector(s);
-function el(tag,attrs={},...kids){
-  const e=document.createElement(tag);
-  for(const [k,v] of Object.entries(attrs||{})){
-    if(k==="class") e.className=v;
-    else if(k.startsWith("on") && typeof v==="function") e.addEventListener(k.slice(2),v);
-    else if(k==="html") e.innerHTML=v;
-    else e.setAttribute(k,v);
-  }
-  for(const k of kids){ if(k==null) continue; e.appendChild(typeof k==="string"?document.createTextNode(k):k); }
-  return e;
-}
-
-/* ---------- Génération du tableau de contrôle ---------- */
-const sectionsWrap = $("#sections");
-const stateMap = {}; // { "cat|item": "ok"|"fix"|"" }
-
-function renderSections(){
-  sectionsWrap.innerHTML = "";
-  CATEGORIES.forEach(([cat, items])=>{
-    const sec = el("div",{class:"section"});
-    const head = el("div",{class:"head"},
-      el("h3",{},cat),
-      el("div",{class:"mini-tools"},
-        el("button",{class:"mini",onclick:()=>setSection(cat,"ok")},"Tout Bon"),
-        el("button",{class:"mini",onclick:()=>setSection(cat,"fix")},"Tout À refaire"),
-        el("button",{class:"mini",onclick:()=>setSection(cat,"")},"Tout Vide")
-      )
-    );
-    const table = el("table",{});
-    table.appendChild(el("thead",{}, el("tr",{},
-      el("th",{},"Contrôle"),
-      el("th",{},"Bon"),
-      el("th",{},"À remettre en état"),
-      el("th",{},"Note")
-    )));
-    const tb = el("tbody",{});
-    items.forEach(item=>{
-      const k = key(cat,item);
-      const tr = el("tr",{});
-      const ok = el("input",{type:"radio",name:k,checked:false,onchange:()=>setState(k,"ok")});
-      const fix= el("input",{type:"radio",name:k,onchange:()=>setState(k,"fix")});
-      tr.append(
-        el("td",{}, item),
-        el("td",{}, ok),
-        el("td",{}, fix),
-        el("td",{}, el("input",{type:"text",placeholder:"Note / mesure",value:"",onchange:(e)=>setNote(k,e.target.value)}))
-      );
-      tr.addEventListener("dblclick", ()=>{ clearState(k); renderSectionsFromState(); });
-      tb.appendChild(tr);
-    });
-    table.appendChild(tb);
-    sec.append(head, table);
-    sectionsWrap.appendChild(sec);
-  });
-}
-
-function key(cat,item){ return `${cat}|${item}`; }
-function setSection(cat,val){
-  CATEGORIES.find(([c])=>c===cat)[1].forEach(it=>{ stateMap[key(cat,it)] = {v:val,n:getNote(key(cat,it))}; });
-  renderSectionsFromState();
-}
-function setState(k,v){ stateMap[k] = {v, n:getNote(k)}; }
-function clearState(k){ stateMap[k] = {v:"", n:getNote(k)}; }
-function setNote(k,n){ stateMap[k] = {v:getVal(k), n}; }
-function getNote(k){ return stateMap[k]?.n || ""; }
-function getVal(k){ return stateMap[k]?.v || ""; }
-
-function renderSectionsFromState(){
-  // re-build and re-apply states
-  renderSections();
-  // apply
-  CATEGORIES.forEach(([cat, items])=>{
-    items.forEach(item=>{
-      const k = key(cat,item);
-      const radios = document.getElementsByName(k);
-      const v = getVal(k);
-      if(radios && radios[0]){
-        if(v==="ok"){ radios[0].checked = true; }
-        if(v==="fix"){ radios[1].checked = true; }
-      }
-      const tr = radios[0]?.closest("tr");
-      const noteInput = tr?.querySelector('input[type="text"]');
-      if(noteInput) noteInput.value = getNote(k);
-      // color line
-      if(tr){
-        tr.style.background = v==="ok" ? "rgba(34,197,94,.08)" : v==="fix" ? "rgba(239,68,68,.08)" : "transparent";
-      }
-    });
-  });
-}
-
-/* ---------- Pièces dynamiques ---------- */
-const partsBody = $("#partsBody");
-function addPartRow(ref="", label="", qte="1"){
-  const tr = el("tr",{});
-  const refI = el("input",{value:ref,placeholder:"Réf."});
-  const labI = el("input",{value:label,placeholder:"Désignation"});
-  const qteI = el("input",{value:qte,type:"number",min:"0",step:"1",class:"qty"});
-  const delB = el("button",{class:"mini",onclick:()=>tr.remove()},"Supprimer");
-  tr.append(
-    el("td",{}, refI),
-    el("td",{}, labI),
-    el("td",{}, qteI),
-    el("td",{}, delB)
-  );
-  partsBody.appendChild(tr);
-}
-$("#addPart").addEventListener("click", ()=>addPartRow());
-$("#clearParts").addEventListener("click", ()=>{ partsBody.innerHTML=""; });
-
-/* ---------- Sauvegarde locale (par immat) ---------- */
-const DBKEY = "garage_fiche_controles_v1";
-function loadAll(){ try{ return JSON.parse(localStorage.getItem(DBKEY))||{} }catch{ return {} } }
-function saveAll(db){ localStorage.setItem(DBKEY, JSON.stringify(db)); }
-
-function collectData(){
-  const parts = Array.from(partsBody.querySelectorAll("tr")).map(tr=>{
-    const tds = tr.querySelectorAll("td input");
-    return {ref:tds[0].value.trim(), label:tds[1].value.trim(), qte:tds[2].value.trim()};
-  });
-  const checks = {};
-  Object.keys(stateMap).forEach(k=> checks[k] = stateMap[k]);
-  return {
-    clientName: $("#clientName").value.trim(),
-    clientEmail: $("#clientEmail").value.trim(),
-    vehicule: $("#vehicule").value.trim(),
-    immat: $("#immat").value.trim().toUpperCase(),
-    km: $("#km").value.trim(),
-    date: $("#date").value || new Date().toISOString().slice(0,10),
-    operateur: $("#operateur").value.trim(),
-    observations: $("#observations").value.trim(),
-    checks,
-    parts
-  };
-}
-function fillFromData(d){
-  $("#clientName").value = d.clientName||"";
-  $("#clientEmail").value = d.clientEmail||"";
-  $("#vehicule").value = d.vehicule||"";
-  $("#immat").value = d.immat||"";
-  $("#km").value = d.km||"";
-  $("#date").value = d.date||"";
-  $("#operateur").value = d.operateur||"";
-  $("#observations").value = d.observations||"";
-  // checks
-  Object.keys(d.checks||{}).forEach(k=> stateMap[k]=d.checks[k]);
-  renderSectionsFromState();
-  // parts
-  partsBody.innerHTML = "";
-  (d.parts||[]).forEach(p=> addPartRow(p.ref,p.label,p.qte));
-}
-
-function save(){
-  const d = collectData();
-  if(!d.immat){ alert("Indique l'immatriculation pour enregistrer."); return; }
-  const db = loadAll();
-  db[d.immat.replace(/[\s-]/g,"")] = d;
-  saveAll(db);
-  alert("Fiche enregistrée.");
-}
-function search(){
-  const key = ($("#searchImmat").value||"").toUpperCase().replace(/[\s-]/g,"");
-  const db = loadAll();
-  if(db[key]){ fillFromData(db[key]); }
-  else{ alert("Aucune fiche trouvée pour cette immatriculation."); }
-}
-
-/* ---------- Impression PDF ---------- */
-function doPrint(){ window.print(); }
-
-/* ---------- Raccourcis & Evénements ---------- */
-$("#saveBtn").addEventListener("click", save);
-$("#saveBtn2").addEventListener("click", save);
-$("#searchBtn").addEventListener("click", search);
-$("#newBtn").addEventListener("click", ()=>{
-  document.querySelectorAll("input,textarea").forEach(i=>{ if(i.type!=="date" && i.type!=="radio" && i.type!=="number") i.value=""; });
-  $("#km").value=""; $("#date").value="";
-  partsBody.innerHTML=""; Object.keys(stateMap).forEach(k=>delete stateMap[k]); renderSectionsFromState();
-});
-$("#printBtn").addEventListener("click", doPrint);
-$("#printBtn2").addEventListener("click", doPrint);
-
-/* ---------- Sauvegarde/Restauration JSON ---------- */
-$("#backupBtn").addEventListener("click", ()=>{
-  const blob = new Blob([JSON.stringify(loadAll(),null,2)], {type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download="garage_fiches.json"; a.click(); URL.revokeObjectURL(a.href);
-});
-$("#restoreFile").addEventListener("change", async (e)=>{
-  const f=e.target.files?.[0]; if(!f) return;
-  try{
-    const txt=await f.text(); const db=JSON.parse(txt); saveAll(db); alert("Restauration OK.");
-  }catch{ alert("Fichier invalide."); }
-});
-
-/* ---------- Init ---------- */
-renderSections(); // première construction
-renderSectionsFromState(); // applique les états (vide)
+const LOGOKEY='garage_logo_gc';const DBKEY='garage_fiches_gc';
+const CATEGORIES=[["VISIBILITÉ",["Balais essuie-glace","Pare-brise","Rétroviseurs"]],["ÉCLAIRAGE",["Feux croisement","Feux stop","Clignotants","Antibrouillard"]],["NIVEAUX",["Huile moteur","Liquide frein","Refroidissement"]],["FREINAGE",["Plaquettes","Disques","Témoin niveau frein"]]];
+const $=s=>document.querySelector(s);
+function el(t,a={},...c){const e=document.createElement(t);for(const[k,v]of Object.entries(a))k.startsWith("on")?e.addEventListener(k.slice(2),v):e.setAttribute(k,v);c.forEach(x=>x!=null&&e.appendChild(typeof x==="string"?document.createTextNode(x):x));return e;}
+const sectionsWrap=$("#sections");const stateMap={};
+function key(c,i){return c+"|"+i;}
+function render(){sectionsWrap.innerHTML="";CATEGORIES.forEach(([cat,items])=>{const sec=el("div",{class:"section"},el("div",{class:"head"},el("h3",{},cat)),el("table",{},el("thead",{},el("tr",{},el("th",{},"Contrôle"),el("th",{},"Bon"),el("th",{},"À faire"))),el("tbody",{},...items.map(it=>{const k=key(cat,it);const ok=el("input",{type:"radio",name:k,onchange:()=>stateMap[k]="ok"});const bad=el("input",{type:"radio",name:k,onchange:()=>stateMap[k]="bad"});return el("tr",{},el("td",{},it),el("td",{},ok),el("td",{},bad));})))));sectionsWrap.appendChild(sec);});}
+render();
+const partsBody=$("#partsBody");
+function addPart(r="",d="",q="1"){const tr=el("tr",{},el("td",{},el("input",{value:r,placeholder:"Réf"})),el("td",{},el("input",{value:d,placeholder:"Désignation"})),el("td",{},el("input",{value:q,type:"number",min:"0"})),el("td",{},el("button",{onclick:()=>tr.remove()},"Suppr")));partsBody.appendChild(tr);}
+$("#addPart").onclick=()=>addPart();$("#clearParts").onclick=()=>partsBody.innerHTML="";
+function loadLogo(){const u=localStorage.getItem(LOGOKEY);if(u){$("#logoImg").src=u;$("#logoImg").style.display="block";}}
+$("#logoFile").addEventListener("change",e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{localStorage.setItem(LOGOKEY,r.result);loadLogo();};r.readAsDataURL(f);});
+$("#clearLogoBtn").onclick=()=>{localStorage.removeItem(LOGOKEY);$("#logoImg").style.display="none";}
+function collect(){const parts=Array.from(partsBody.querySelectorAll("tr")).map(tr=>{const i=tr.querySelectorAll("input");return{ref:i[0].value,label:i[1].value,qte:i[2].value};});return{client:$("#clientName").value,email:$("#clientEmail").value,vehicule:$("#vehicule").value,immat:$("#immat").value.toUpperCase(),km:$("#km").value,date:$("#date").value,obs:$("#observations").value,checks:stateMap,parts};}
+function save(){const d=collect();if(!d.immat){alert("Immat requise");return;}const db=JSON.parse(localStorage.getItem(DBKEY)||"{}");db[d.immat]=d;localStorage.setItem(DBKEY,JSON.stringify(db));alert("Fiche enregistrée");}
+function search(){const key=($("#searchImmat").value||"").toUpperCase();const db=JSON.parse(localStorage.getItem(DBKEY)||"{}");if(db[key])fill(db[key]);else alert("Aucune fiche trouvée");}
+function fill(d){$("#clientName").value=d.client;$("#clientEmail").value=d.email;$("#vehicule").value=d.vehicule;$("#immat").value=d.immat;$("#km").value=d.km;$("#date").value=d.date;$("#observations").value=d.obs;partsBody.innerHTML="";(d.parts||[]).forEach(p=>addPart(p.ref,p.label,p.qte));Object.assign(stateMap,d.checks||{});render();}
+$("#saveBtn").onclick=save;$("#searchBtn").onclick=search;$("#printBtn").onclick=()=>window.print();$("#newBtn").onclick=()=>location.reload();loadLogo();addPart();
 </script>
 </body>
 </html>
