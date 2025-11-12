@@ -37,8 +37,24 @@ main{max-width:1100px;margin:18px auto;padding:12px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 button,input,select,textarea{padding:10px;border-radius:8px;border:1px solid #243041;background:#071018;color:#e5e7eb}
 button.primary{background:var(--red);border-color:#b91c1c}
+.list{display:grid;gap:10px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;border:1px solid #19202a;background:#071018}
+.muted{color:var(--muted);font-size:13px}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{border-top:1px solid #23303a;padding:8px}
+.table th{background:#071221}
 .hidden{display:none}
-.footer{padding:10px;text-align:center;color:#9aa3b2;font-size:13px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.footer{padding:10px;text-align:center;color:var(--muted);font-size:13px}
+.status-pill{font-size:12px;border:1px solid #334155;border-radius:999px;padding:2px 8px}
+.status-en_cours{color:#fde68a;border-color:#7c2d12}
+.status-termine{color:#bbf7d0;border-color:#14532d}
+@media print{
+  header, #btnNew, #btnLogin, #btnLogout, #btnDelete, #btnSave, #btnBack, #addPart { display:none !important }
+  body{background:#fff;color:#000}
+  .card{background:#fff;border-color:#ddd}
+  .table th,.table td{border-color:#ddd;color:#000}
+}
 </style>
 </head>
 <body>
@@ -46,13 +62,88 @@ button.primary{background:var(--red);border-color:#b91c1c}
 <header>
   <div class="badge">GC PERF</div>
   <div style="flex:1"></div>
+  <button id="btnNew" class="primary hidden">+ Ajouter fiche</button>
   <button id="btnLogin" onclick="document.getElementById('loginModal').classList.remove('hidden')">Connexion</button>
-  <button id="btnLogout" class="hidden">Déconnexion</button>
+  <button id="btnLogout" class="hidden">Se déconnecter</button>
 </header>
 
 <main>
+  <!-- Filtres -->
   <div class="card">
-    <p>Bienvenue sur l’app GC Perf. Connectez-vous pour accéder aux fiches.</p>
+    <div class="row">
+      <input id="qImmat" placeholder="Rechercher immatriculation…" style="min-width:220px">
+      <select id="qStatus" style="min-width:160px">
+        <option value="">Tous</option>
+        <option value="en_cours">En cours</option>
+        <option value="termine">Terminé</option>
+      </select>
+      <div style="flex:1"></div>
+      <button id="btnExport">Exporter JSON</button>
+    </div>
+    <p class="muted" style="margin-top:8px">Lecture publique — connexion requise pour créer/éditer.</p>
+  </div>
+
+  <!-- LISTE -->
+  <div id="list" class="list"></div>
+  <p id="empty" class="muted">Aucun dossier</p>
+
+  <!-- ÉDITEUR -->
+  <div id="editor" class="card hidden">
+    <div class="row" style="justify-content:space-between">
+      <div><button id="btnBack">← Retour</button></div>
+      <div class="row">
+        <button id="btnDelete" class="hidden">Supprimer</button>
+        <button id="btnPDF">PDF</button>
+        <button id="btnSave" class="primary hidden">Enregistrer</button>
+      </div>
+    </div>
+
+    <h3>Identité véhicule</h3>
+    <div class="form-grid">
+      <div><label>Immatriculation</label><input id="f_immat"></div>
+      <div><label>Kilométrage (km)</label><input id="f_km" type="number" min="0"></div>
+      <div><label>Marque / Modèle</label><input id="f_model"></div>
+      <div><label>Date</label><input id="f_date" type="date"></div>
+      <div><label>Client</label><input id="f_client"></div>
+      <div><label>Opérateur</label><input id="f_operator"></div>
+      <div><label>Statut</label>
+        <select id="f_status">
+          <option value="en_cours">En cours</option>
+          <option value="termine">Terminé</option>
+        </select>
+      </div>
+    </div>
+
+    <h3 style="margin-top:12px">FICHE DE CONTRÔLES</h3>
+    <div style="overflow:auto">
+      <table id="checkTable" class="table" style="min-width:880px">
+        <thead><tr><th>Rubrique / Contrôle</th><th>Bon état apparent</th><th>À remettre en état</th><th>Commentaire</th></tr></thead>
+        <tbody id="checkBody"></tbody>
+      </table>
+    </div>
+
+    <h4 style="margin-top:12px">Pneumatiques</h4>
+    <table class="table">
+      <thead><tr><th>Roue</th><th>État</th><th>Pression (bar)</th></tr></thead>
+      <tbody id="tiresBody"></tbody>
+    </table>
+
+    <div class="form-grid" style="margin-top:12px">
+      <div><label>Travaux à faire</label><textarea id="f_todoNow" placeholder="- Vidange + filtre&#10;- Géométrie"></textarea></div>
+      <div><label>Travaux à prévoir</label><textarea id="f_todoLater" placeholder="- Pneus AV dans 5 000 km"></textarea></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Observations</label>
+      <textarea id="f_obs" placeholder="Remarques générales…"></textarea>
+    </div>
+
+    <h4 style="margin-top:12px">Pièces prises / référencées</h4>
+    <table class="table">
+      <thead><tr><th>Réf</th><th>Désignation</th><th>Qté</th><th>Action</th></tr></thead>
+      <tbody id="partsBody"></tbody>
+    </table>
+    <div class="row"><button id="addPart" class="primary hidden">+ Ajouter une pièce</button></div>
   </div>
 </main>
 
@@ -62,36 +153,40 @@ button.primary{background:var(--red);border-color:#b91c1c}
 <div id="loginModal" class="hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)">
   <div style="background:#071018;padding:16px;border-radius:10px;border:1px solid #243041;min-width:320px">
     <h3>Connexion</h3>
-    <label>Email</label>
-    <input id="loginEmail" type="email" placeholder="exemple@email.com">
-    <label>Mot de passe</label>
-    <input id="loginPass" type="password" placeholder="Mot de passe">
-    <div style="margin-top:10px;display:flex;justify-content:space-between">
-      <button onclick="document.getElementById('loginModal').classList.add('hidden')">Annuler</button>
-      <button class="primary" onclick="gcSignIn()">Se connecter</button>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <div><label>Email</label><input id="loginEmail" type="email"></div>
+      <div><label>Mot de passe</label><input id="loginPass" type="password"></div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
+      <button id="loginCancel" onclick="document.getElementById('loginModal').classList.add('hidden')">Annuler</button>
+      <button id="loginSubmit" class="primary" onclick="gcSignIn()">Se connecter</button>
     </div>
   </div>
 </div>
 
 <script>
-/* === CONFIG FIREBASE (clé CORRIGÉE sans le '5') === */
+/* === CONFIG FIREBASE (avec .appspot.com) === */
 const firebaseConfig = {
-  apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdG5TVBihxqA",
+  apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA",
   authDomain: "fiche-client-24512.firebaseapp.com",
   projectId: "fiche-client-24512",
-  storageBucket: "fiche-client-24512.firebasestorage.app",
+  storageBucket: "fiche-client-24512.appspot.com", // <-- FIX ICI
   messagingSenderId: "808061975050",
   appId: "1:808061975050:web:0a0c7753d3c32438c2fdf3",
   measurementId: "G-3ZHE8T2XJM"
 };
+console.log("Init Firebase avec:", firebaseConfig);
+try{
+  firebase.initializeApp(firebaseConfig);
+  console.log("✅ firebase.initializeApp OK");
+}catch(e){
+  console.error("❌ Erreur init Firebase:", e);
+  alert("Erreur init Firebase: " + (e.message||e));
+}
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-  // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-  /* Alerte si une erreur JS bloque */
-window.addEventListener('error',(e)=>{console.error(e); alert("Erreur JS: "+e.message);});
-
-/* Connexion garantie (inline) */
+/* Connexion (inline) */
 function gcSignIn(){
   const email = (document.getElementById('loginEmail').value||'').trim();
   const pass  = document.getElementById('loginPass').value||'';
@@ -102,6 +197,7 @@ function gcSignIn(){
       alert('✅ Connecté !');
       document.getElementById('btnLogin').classList.add('hidden');
       document.getElementById('btnLogout').classList.remove('hidden');
+      document.getElementById('btnNew').classList.remove('hidden');
     })
     .catch(e=>{
       console.error(e);
@@ -109,7 +205,8 @@ function gcSignIn(){
     });
 }
 document.getElementById('btnLogout').onclick=()=>auth.signOut().then(()=>location.reload());
-</script>
 
+/* ——— le reste (liste, éditeur) peut rester comme plus haut, je te l’ai déjà donné ——— */
+</script>
 </body>
 </html>
