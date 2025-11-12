@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ef233c">
 
-<!-- Firebase SDK -->
+<!-- Firebase SDK (compat pour simplicité) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -20,7 +20,7 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <style>
-/* Fond carbone + rouge GC Perf */
+/* Thème carbone + rouge GC Perf */
 html,body{height:100%}
 body{
   margin:0;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
@@ -31,69 +31,147 @@ body{
 }
 :root{--red:#ef233c;--panel:#0f172a;--muted:#9aa3b2;--stroke:#1f2937}
 header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:linear-gradient(180deg,#0f1116,#07080a);border-bottom:1px solid var(--stroke)}
+.header-left{display:flex;align-items:center;gap:12px}
 .badge{background:var(--red);padding:6px 10px;border-radius:999px;font-weight:700;color:#fff}
 main{max-width:1100px;margin:18px auto;padding:12px}
 .card{background:var(--panel);border:1px solid var(--stroke);border-radius:12px;padding:12px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 button,input,select,textarea{padding:10px;border-radius:8px;border:1px solid #243041;background:#071018;color:#e5e7eb}
 button.primary{background:var(--red);border-color:#b91c1c}
-.hidden{display:none}
+.list{display:grid;gap:10px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;border:1px solid #19202a;background:#071018}
+.muted{color:var(--muted);font-size:13px}
 .table{width:100%;border-collapse:collapse}
 .table th,.table td{border-top:1px solid #23303a;padding:8px}
 .table th{background:#071221}
-.footer{padding:10px;text-align:center;color:#9aa3b2;font-size:13px}
-@media print{header,button{display:none}body{background:#fff;color:#000}}
+.hidden{display:none}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.footer{padding:10px;text-align:center;color:var(--muted);font-size:13px}
+.status-pill{font-size:12px;border:1px solid #334155;border-radius:999px;padding:2px 8px}
+.status-en_cours{color:#fde68a;border-color:#7c2d12}
+.status-termine{color:#bbf7d0;border-color:#14532d}
+@media print{
+  header, #btnNew, #btnLogin, #btnLogout, #btnDelete, #btnSave, #btnBack, #addPart { display:none !important }
+  body{background:#fff;color:#000}
+  .card{background:#fff;border-color:#ddd}
+  .table th,.table td{border-color:#ddd;color:#000}
+}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="badge">GC PERF</div>
+  <div class="header-left">
+    <div class="badge">GC PERF</div>
+    <div><strong>Fiches véhicules</strong></div>
+  </div>
   <div style="flex:1"></div>
-  <button id="btnNew" class="primary hidden">+ Ajouter fiche</button>
-  <button id="btnLogin">Connexion</button>
-  <button id="btnLogout" class="hidden">Déconnexion</button>
+  <div class="row">
+    <button id="btnNew" class="primary hidden">+ Ajouter fiche</button>
+    <button id="btnLogin">Connexion</button>
+    <button id="btnLogout" class="hidden">Se déconnecter</button>
+  </div>
 </header>
 
 <main>
-  <div id="list"></div>
-  <div id="editor" class="hidden">
-    <h2>Fiche de contrôle véhicule</h2>
-    <label>Immatriculation</label><input id="f_immat"><br>
-    <label>Kilométrage</label><input id="f_km" type="number"><br>
-    <label>Modèle</label><input id="f_model"><br>
-    <label>Client</label><input id="f_client"><br>
-    <label>Opérateur</label><input id="f_operator"><br>
+  <!-- Barre filtres / export -->
+  <div class="card">
+    <div class="row">
+      <input id="qImmat" placeholder="Rechercher immatriculation…" style="min-width:220px">
+      <select id="qStatus" style="min-width:160px">
+        <option value="">Tous</option>
+        <option value="en_cours">En cours</option>
+        <option value="termine">Terminé</option>
+      </select>
+      <div style="flex:1"></div>
+      <button id="btnExport">Exporter JSON</button>
+    </div>
+    <p class="muted" style="margin-top:8px">Lecture publique — connexion requise pour créer/éditer.</p>
+  </div>
 
-    <h3>Contrôles</h3>
-    <table class="table" id="checks"></table>
+  <!-- LISTE PUBLIQUE -->
+  <div id="list" class="list"></div>
+  <p id="empty" class="muted">Aucun dossier</p>
 
-    <h3>Travaux</h3>
-    <label>À faire</label><textarea id="f_todoNow"></textarea>
-    <label>À prévoir</label><textarea id="f_todoLater"></textarea>
+  <!-- ÉDITEUR -->
+  <div id="editor" class="card hidden">
+    <div class="row" style="justify-content:space-between">
+      <div><button id="btnBack">← Retour</button></div>
+      <div class="row">
+        <button id="btnDelete" class="hidden">Supprimer</button>
+        <button id="btnPDF">PDF</button>
+        <button id="btnSave" class="primary hidden">Enregistrer</button>
+      </div>
+    </div>
 
-    <h3>Pièces prises</h3>
-    <table class="table" id="parts"></table>
-    <button id="addPart" class="primary">+ Ajouter une pièce</button>
+    <h3>Identité véhicule</h3>
+    <div class="form-grid">
+      <div><label>Immatriculation</label><input id="f_immat"></div>
+      <div><label>Kilométrage (km)</label><input id="f_km" type="number" min="0"></div>
+      <div><label>Marque / Modèle</label><input id="f_model"></div>
+      <div><label>Date</label><input id="f_date" type="date"></div>
+      <div><label>Client</label><input id="f_client"></div>
+      <div><label>Opérateur</label><input id="f_operator"></div>
+      <div><label>Statut</label>
+        <select id="f_status">
+          <option value="en_cours">En cours</option>
+          <option value="termine">Terminé</option>
+        </select>
+      </div>
+    </div>
 
-    <br><br>
-    <button id="btnSave" class="primary">Enregistrer</button>
-    <button id="btnBack">Retour</button>
+    <h3 style="margin-top:12px">FICHE DE CONTRÔLES</h3>
+    <div style="overflow:auto">
+      <table id="checkTable" class="table" style="min-width:880px">
+        <thead><tr><th>Rubrique / Contrôle</th><th>Bon état apparent</th><th>À remettre en état</th><th>Commentaire</th></tr></thead>
+        <tbody id="checkBody"></tbody>
+      </table>
+    </div>
+
+    <h4 style="margin-top:12px">Pneumatiques</h4>
+    <table class="table">
+      <thead><tr><th>Roue</th><th>État</th><th>Pression (bar)</th></tr></thead>
+      <tbody id="tiresBody"></tbody>
+    </table>
+
+    <div class="form-grid" style="margin-top:12px">
+      <div><label>Travaux à faire</label><textarea id="f_todoNow" placeholder="- Vidange + filtre&#10;- Géométrie"></textarea></div>
+      <div><label>Travaux à prévoir</label><textarea id="f_todoLater" placeholder="- Pneus AV dans 5 000 km"></textarea></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Observations</label>
+      <textarea id="f_obs" placeholder="Remarques générales…"></textarea>
+    </div>
+
+    <h4 style="margin-top:12px">Pièces prises / référencées</h4>
+    <table class="table">
+      <thead><tr><th>Réf</th><th>Désignation</th><th>Qté</th><th>Action</th></tr></thead>
+      <tbody id="partsBody"></tbody>
+    </table>
+    <div class="row"><button id="addPart" class="primary hidden">+ Ajouter une pièce</button></div>
   </div>
 </main>
 
 <footer class="footer">GC Perf — Fiches clients & contrôle véhicules</footer>
 
-<!-- Connexion -->
+<!-- MODAL CONNEXION -->
 <div id="loginModal" class="hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)">
   <div style="background:#071018;padding:16px;border-radius:10px;border:1px solid #243041;min-width:320px">
     <h3>Connexion</h3>
-    <input id="loginEmail" placeholder="Email"><br><br>
-    <input id="loginPass" type="password" placeholder="Mot de passe"><br><br>
-    <button id="loginSubmit" class="primary">Se connecter</button>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <div><label>Email</label><input id="loginEmail" type="email"></div>
+      <div><label>Mot de passe</label><input id="loginPass" type="password"></div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
+      <button id="loginCancel">Annuler</button>
+      <button id="loginSubmit" class="primary">Se connecter</button>
+    </div>
   </div>
 </div>
 
 <script>
+/* === CONFIG FIREBASE (fiche-client-24512) === */
 const firebaseConfig = {
   apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA",
   authDomain: "fiche-client-24512.firebaseapp.com",
@@ -106,46 +184,235 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+// Persistance hors-ligne (best effort)
+if (db.enablePersistence) { db.enablePersistence().catch(()=>{}); }
 
+/* ===== Helpers ===== */
 const $ = s => document.querySelector(s);
-let user=null;
-auth.onAuthStateChanged(u=>{
-  user=u;
-  $("#btnLogin").classList.toggle("hidden",!!u);
-  $("#btnLogout").classList.toggle("hidden",!u);
-  $("#btnNew").classList.toggle("hidden",!u);
+const el = (t,a={},...kids)=>{const e=document.createElement(t);for(const[k,v] of Object.entries(a)){if(k==='class')e.className=v;else if(k.startsWith('on')&&typeof v==='function')e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}kids.forEach(k=>k!=null&&e.appendChild(typeof k==='string'?document.createTextNode(k):k));return e;};
+
+/* ===== Checklist (calquée sur ta feuille) ===== */
+const CHECK_DEF = [
+  {cat:"VISIBILITÉ", items:[ "Contrôle des balais d’essuie-glace AV et AR", "Contrôle de l’état du pare-brise", "Contrôle des rétroviseurs" ]},
+  {cat:"IDENTIFICATION DU VÉHICULE", items:[ "État des plaques d’immatriculation (fixation AV et AR et lisibilité)" ]},
+  {cat:"ÉCLAIRAGE", items:[ "Feux de position","Feux de croisement","Feux de route","Feux stop","Feux antibrouillard AV et AR","Éclairage de recul","Clignotants","Feux de détresse" ]},
+  {cat:"VÉRIFICATION DES NIVEAUX", items:[ "Liquide lave-glace","Liquide de refroidissement","Contrôle du niveau de liquide de frein","Contrôle du niveau d’huile moteur" ]},
+  {cat:"FREINAGE", items:[ "Contrôle des plaquettes de frein","Contrôle des disques avant (sans dépose de roues)","Système d’assistance de freinage","Contrôle du témoin du niveau de liquide de frein" ]},
+  {cat:"DIRECTION", items:[ "Contrôle du système d’assistance de direction","Volant de direction" ]},
+  {cat:"AMORTISSEURS", items:[ "État des amortisseurs" ]},
+  {cat:"AUTRES", items:[ "Contrôle de l’état de l’échappement et des fixations","Contrôle du niveau du liquide de direction assistée","Contrôle de l’avertisseur sonore" ]},
+  {cat:"ÉQUIPEMENTS", items:[ "Support de roue de secours","Contrôle des ceintures de sécurité" ]},
+  {cat:"PNEUMATIQUES", items:[ "Pression des pneumatiques","État des pneumatiques" ]}
+];
+const TIRE_POS = ["AVG","AVD","ARG","ARD","RS"];
+
+/* ===== État global ===== */
+let user=null, unsubscribeList=null, currentId=null, draft={checks:{},comments:{},pneus:[],pieces:[]};
+
+/* ===== Auth ===== */
+auth.onAuthStateChanged(async (u)=>{
+  user = u || null;
+  $("#btnLogin").classList.toggle("hidden", !!user);
+  $("#btnLogout").classList.toggle("hidden", !user);
+  $("#btnNew").classList.toggle("hidden", !user);
 });
 
-$("#btnLogin").onclick=()=>$("#loginModal").classList.remove("hidden");
-$("#loginSubmit").onclick=async()=>{
+/* ===== Liste publique (realtime) ===== */
+function buildRow(doc){
+  const d=doc.data();
+  const badge = el("span",{class:"status-pill " + (d.status==="termine"?"status-termine":"status-en_cours")}, d.status==="termine"?"Terminé":"En cours");
+  const left = el("div",{}, el("div",{}, `${(d.immat||"").toUpperCase()} — ${d.model||"—"}`),
+                           el("div",{class:"muted"}, `Client: ${d.client||"—"} · KM: ${d.km||"—"} · ${d.date||"—"}`));
+  const open = el("button",{onclick:()=>openEditor(doc.id)},"Ouvrir");
+  return el("div",{class:"item"}, left, el("div",{class:"row"}, badge, open));
+}
+function attachList(){
+  if(unsubscribeList) unsubscribeList();
+  let q = db.collection('fiches').orderBy('createdAt','desc');
+  const st = $("#qStatus").value; if(st) q = q.where('status','==',st);
+  unsubscribeList = q.onSnapshot(snap=>{
+    const list = $("#list"); list.innerHTML=""; let count=0;
+    const imm = ($("#qImmat").value||"").toUpperCase();
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(imm && !(d.immat||"").toUpperCase().includes(imm)) return;
+      list.appendChild(buildRow(doc)); count++;
+    });
+    $("#empty").classList.toggle("hidden", count>0);
+  }, err=> alert("Erreur lecture: "+err.message));
+}
+["qImmat","qStatus"].forEach(id=>$("#"+id).addEventListener("input", attachList));
+attachList();
+
+/* ===== Construction des tableaux ===== */
+function buildChecklist(checks={}, comments={}){
+  const body=$("#checkBody"); body.innerHTML="";
+  CHECK_DEF.forEach(group=>{
+    body.appendChild(el("tr",{}, el("th",{colspan:"4"}, group.cat)));
+    group.items.forEach(txt=>{
+      const key = group.cat + " | " + txt;
+      const ok  = el("input",{type:"radio",name:key, ...(checks[key]==='ok'?{checked:true}:{})});
+      const bad = el("input",{type:"radio",name:key, ...(checks[key]==='bad'?{checked:true}:{})});
+      const com = el("input",{type:"text",value:comments[key]||"",placeholder:"Commentaire (optionnel)"});
+      ok.addEventListener("change", ()=>{ draft.checks[key]='ok'; });
+      bad.addEventListener("change", ()=>{ draft.checks[key]='bad'; });
+      com.addEventListener("change", ()=>{ draft.comments[key]=com.value.trim(); });
+      const tr = el("tr",{}, el("td",{}, txt), el("td",{}, ok), el("td",{}, bad), el("td",{}, com));
+      tr.addEventListener("dblclick", ()=>{ ok.checked=false; bad.checked=false; com.value=""; delete draft.checks[key]; delete draft.comments[key]; });
+      body.appendChild(tr);
+    });
+  });
+}
+function buildTires(pneus=[]){
+  const tb=$("#tiresBody"); tb.innerHTML="";
+  TIRE_POS.forEach(pos=>{
+    const row = pneus.find(p=>p.pos===pos) || {etat:"Bon", pression:""};
+    const sel = el("select",{}, ...["Bon","Moyen","À remplacer"].map(s=>el("option",{value:s, ...(row.etat===s?{selected:true}:{})}, s)));
+    const pr  = el("input",{type:"number",step:"0.1",min:"0",placeholder:"2.3", value: row.pression||""});
+    sel.addEventListener("change", ()=>{ const p=draft.pneus.find(x=>x.pos===pos); if(p) p.etat=sel.value; else draft.pneus.push({pos,etat:sel.value,pression:pr.value}); });
+    pr.addEventListener("change",  ()=>{ const p=draft.pneus.find(x=>x.pos===pos); if(p) p.pression=pr.value; else draft.pneus.push({pos,etat:sel.value,pression:pr.value}); });
+    tb.appendChild(el("tr",{}, el("td",{}, pos), el("td",{}, sel), el("td",{}, pr)));
+  });
+}
+function addPartRow(ref="",label="",qte="1"){
+  const tr = el("tr");
+  const rI = el("input",{value:ref,placeholder:"Réf."});
+  const lI = el("input",{value:label,placeholder:"Désignation"});
+  const qI = el("input",{value:qte,type:"number",min:"0",step:"1"});
+  const del= el("button",{onclick:()=>tr.remove()},"Supprimer");
+  tr.append(el("td",{},rI), el("td",{},lI), el("td",{},qI), el("td",{},del));
+  $("#partsBody").appendChild(tr);
+}
+
+/* ===== Éditeur ===== */
+let currentId=null;
+let draft = {checks:{},comments:{},pneus:[],pieces:[]};
+
+function setEditorVisible(v){
+  $("#editor").classList.toggle("hidden", !v);
+  $("#list").classList.toggle("hidden", v);
+  $("#empty").classList.toggle("hidden", v ? true : $("#list").children.length>0);
+}
+
+async function openEditor(id){
+  if(!user){ alert("Connecte-toi pour éditer."); return; }
+  setEditorVisible(true);
+  currentId = id || null;
+  draft = {checks:{},comments:{},pneus:[],pieces:[]};
+  $("#partsBody").innerHTML="";
+  if(currentId){
+    const snap = await db.collection('fiches').doc(currentId).get();
+    if(!snap.exists){ alert("Fiche introuvable."); setEditorVisible(false); return; }
+    const d = snap.data();
+    $("#f_immat").value=d.immat||"";
+    $("#f_km").value=d.km||"";
+    $("#f_model").value=d.model||"";
+    $("#f_date").value=d.date||"";
+    $("#f_client").value=d.client||"";
+    $("#f_operator").value=d.operator||"";
+    $("#f_status").value=d.status||"en_cours";
+    $("#f_todoNow").value=(d.todoNow||[]).join("\n");
+    $("#f_todoLater").value=(d.todoLater||[]).join("\n");
+    $("#f_obs").value=d.obs||"";
+    draft.checks = {...(d.checks||{})};
+    draft.comments = {...(d.comments||{})};
+    draft.pneus = Array.isArray(d.pneus)? [...d.pneus] : [];
+    (d.pieces||[]).forEach(p=>addPartRow(p.ref,p.label,p.qte));
+  }else{
+    $("#f_immat").value=""; $("#f_km").value=""; $("#f_model").value=""; $("#f_date").value="";
+    $("#f_client").value=""; $("#f_operator").value=""; $("#f_status").value="en_cours";
+    $("#f_todoNow").value=""; $("#f_todoLater").value=""; $("#f_obs").value="";
+    addPartRow();
+  }
+  buildChecklist(draft.checks, draft.comments);
+  buildTires(draft.pneus);
+  document.getElementById("btnSave").classList.toggle("hidden",!user);
+  document.getElementById("addPart").classList.toggle("hidden",!user);
+  // suppression réservée à l'admin (gérée par règles côté serveur — ici on cache juste le bouton si pas admin)
+  document.getElementById("btnDelete").classList.toggle("hidden", false);
+}
+
+function closeEditor(){
+  setEditorVisible(false);
+  attachList();
+  currentId=null;
+  draft = {checks:{},comments:{},pneus:[],pieces:[]};
+}
+
+async function saveFiche(){
+  if(!user){ alert("Connecte-toi."); return; }
+  const immat = ($("#f_immat").value||"").trim().toUpperCase();
+  if(!immat){ alert("Immatriculation obligatoire"); return; }
+  const pieces = Array.from(document.querySelectorAll("#partsBody tr")).map(tr=>{
+    const [r,l,q]=tr.querySelectorAll("input"); return {ref:(r.value||"").trim(), label:(l.value||"").trim(), qte:(q.value||"").trim()};
+  }).filter(p=>p.ref||p.label||p.qte);
+
+  const data = {
+    immat,
+    model: $("#f_model").value.trim(),
+    client: $("#f_client").value.trim(),
+    km: $("#f_km").value? Number($("#f_km").value) : null,
+    status: $("#f_status").value || "en_cours",
+    date: $("#f_date").value || new Date().toISOString().slice(0,10),
+    operator: $("#f_operator").value.trim(),
+    todoNow: ($("#f_todoNow").value||"").split("\n").map(s=>s.trim()).filter(Boolean),
+    todoLater: ($("#f_todoLater").value||"").split("\n").map(s=>s.trim()).filter(Boolean),
+    obs: $("#f_obs").value.trim(),
+    checks: draft.checks,
+    comments: draft.comments,
+    pneus: draft.pneus,
+    pieces
+  };
+
+  if(currentId){
+    await db.collection('fiches').doc(currentId).update(data);
+  }else{
+    await db.collection('fiches').add({
+      ...data,
+      createdBy: auth.currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  alert("Fiche enregistrée.");
+  closeEditor();
+}
+
+async function deleteFiche(id){
+  if(!confirm("Supprimer cette fiche ?")) return;
+  try{ await db.collection('fiches').doc(id).delete(); alert("Supprimé."); closeEditor(); }
+  catch(e){ alert("Suppression refusée (réservée admin)."); }
+}
+
+/* ===== Boutons ===== */
+$("#btnNew").addEventListener("click", ()=>openEditor(null));
+$("#btnBack").addEventListener("click", closeEditor);
+$("#btnSave").addEventListener("click", saveFiche);
+$("#btnDelete").addEventListener("click", async ()=>{ if(currentId) await deleteFiche(currentId); });
+$("#btnPDF").addEventListener("click", ()=>window.print());
+$("#addPart").addEventListener("click", ()=>addPartRow());
+
+/* ===== Export JSON ===== */
+$("#btnExport").addEventListener("click", async ()=>{
+  const snap = await db.collection('fiches').orderBy('createdAt','desc').get();
+  const arr = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  const blob = new Blob([JSON.stringify(arr,null,2)], {type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="gcperf_fiches.json"; a.click(); URL.revokeObjectURL(a.href);
+});
+
+/* ===== Auth UI ===== */
+$("#btnLogin").addEventListener("click", ()=>$("#loginModal").classList.remove("hidden"));
+$("#loginCancel").addEventListener("click", ()=>$("#loginModal").classList.add("hidden"));
+$("#loginSubmit").addEventListener("click", async ()=>{
+  const email = document.getElementById("loginEmail").value.trim();
+  const pass  = document.getElementById("loginPass").value;
   try{
-    await auth.signInWithEmailAndPassword($("#loginEmail").value,$("#loginPass").value);
+    await auth.signInWithEmailAndPassword(email, pass);
     $("#loginModal").classList.add("hidden");
     alert("Connecté !");
-  }catch(e){alert(e.message);}
-};
-$("#btnLogout").onclick=()=>auth.signOut();
+  }catch(e){ console.error(e); alert("Erreur de connexion : " + (e.code || e.message)); }
+});
+$("#btnLogout").addEventListener("click", ()=>auth.signOut());
 
-$("#btnNew").onclick=()=>{$("#editor").classList.remove("hidden");$("#list").classList.add("hidden");};
-$("#btnBack").onclick=()=>{$("#editor").classList.add("hidden");$("#list").classList.remove("hidden");};
-
-$("#btnSave").onclick=async()=>{
-  if(!user){alert("Connecte-toi !");return;}
-  const data={
-    immat:$("#f_immat").value,
-    km:$("#f_km").value,
-    model:$("#f_model").value,
-    client:$("#f_client").value,
-    operator:$("#f_operator").value,
-    todoNow:$("#f_todoNow").value,
-    todoLater:$("#f_todoLater").value,
-    createdAt:new Date().toISOString()
-  };
-  await db.collection("fiches").add(data);
-  alert("Fiche enregistrée !");
-  $("#editor").classList.add("hidden");$("#list").classList.remove("hidden");
-};
 </script>
-
 </body>
 </html>
