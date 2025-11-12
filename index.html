@@ -14,16 +14,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  // Enregistrement du service worker (PWA hors ligne)
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(e => console.warn("SW failed:", e));
-    });
-  }
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js'));
+}
 </script>
 
 <style>
-/* --- Thème carbone + rouge --- */
+/* Fond carbone + rouge GC Perf */
 html,body{height:100%}
 body{
   margin:0;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
@@ -34,133 +31,69 @@ body{
 }
 :root{--red:#ef233c;--panel:#0f172a;--muted:#9aa3b2;--stroke:#1f2937}
 header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:linear-gradient(180deg,#0f1116,#07080a);border-bottom:1px solid var(--stroke)}
-.header-left{display:flex;align-items:center;gap:12px}
 .badge{background:var(--red);padding:6px 10px;border-radius:999px;font-weight:700;color:#fff}
 main{max-width:1100px;margin:18px auto;padding:12px}
 .card{background:var(--panel);border:1px solid var(--stroke);border-radius:12px;padding:12px;margin-bottom:12px}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 button,input,select,textarea{padding:10px;border-radius:8px;border:1px solid #243041;background:#071018;color:#e5e7eb}
 button.primary{background:var(--red);border-color:#b91c1c}
-.list{display:grid;gap:10px}
-.item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;border:1px solid #19202a;background:#071018}
-.muted{color:var(--muted);font-size:13px}
+.hidden{display:none}
 .table{width:100%;border-collapse:collapse}
 .table th,.table td{border-top:1px solid #23303a;padding:8px}
 .table th{background:#071221}
-.hidden{display:none}
-.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-.footer{padding:10px;text-align:center;color:var(--muted);font-size:13px}
-@media print{header,button{display:none}body{background:#fff;color:#000} .card{background:#fff;border-color:#ddd}}
+.footer{padding:10px;text-align:center;color:#9aa3b2;font-size:13px}
+@media print{header,button{display:none}body{background:#fff;color:#000}}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="header-left">
-    <div class="badge">GC PERF</div>
-    <div><strong>Fiches véhicules</strong></div>
-  </div>
+  <div class="badge">GC PERF</div>
   <div style="flex:1"></div>
-  <div class="row">
-    <button id="btnNew" class="primary hidden">+ Ajouter fiche</button>
-    <button id="btnLogin">Connexion</button>
-    <button id="btnLogout" class="hidden">Se déconnecter</button>
-    <span id="adminBadge" class="hidden" style="background:#1f2937;padding:6px 10px;border-radius:999px">ADMIN</span>
-  </div>
+  <button id="btnNew" class="primary hidden">+ Ajouter fiche</button>
+  <button id="btnLogin">Connexion</button>
+  <button id="btnLogout" class="hidden">Déconnexion</button>
 </header>
 
 <main>
-  <div class="card">
-    <div class="row">
-      <input id="qImmat" placeholder="Rechercher immatriculation…" style="min-width:220px">
-      <select id="qStatus" style="min-width:160px">
-        <option value="">Tous</option>
-        <option value="en_cours">En cours</option>
-        <option value="termine">Terminé</option>
-      </select>
-      <div style="flex:1"></div>
-      <button id="btnExport">Exporter JSON</button>
-      <button id="btnImport">Importer JSON</button>
-      <input id="fileImport" type="file" accept=".json" style="display:none">
-    </div>
-    <p class="muted" style="margin-top:8px">Lecture publique — connexion requise pour modifier.</p>
-  </div>
+  <div id="list"></div>
+  <div id="editor" class="hidden">
+    <h2>Fiche de contrôle véhicule</h2>
+    <label>Immatriculation</label><input id="f_immat"><br>
+    <label>Kilométrage</label><input id="f_km" type="number"><br>
+    <label>Modèle</label><input id="f_model"><br>
+    <label>Client</label><input id="f_client"><br>
+    <label>Opérateur</label><input id="f_operator"><br>
 
-  <div id="list" class="list"></div>
-  <p id="empty" class="muted">Aucun dossier</p>
+    <h3>Contrôles</h3>
+    <table class="table" id="checks"></table>
 
-  <div id="editor" class="card hidden">
-    <div class="row" style="justify-content:space-between">
-      <div><button id="btnBack">← Retour</button></div>
-      <div class="row">
-        <button id="btnDelete" class="hidden">Supprimer</button>
-        <button id="btnPDF">PDF</button>
-        <button id="btnSave" class="primary hidden">Enregistrer</button>
-      </div>
-    </div>
+    <h3>Travaux</h3>
+    <label>À faire</label><textarea id="f_todoNow"></textarea>
+    <label>À prévoir</label><textarea id="f_todoLater"></textarea>
 
-    <h3>Identité véhicule</h3>
-    <div class="form-grid">
-      <div><label>Immatriculation</label><input id="f_immat"></div>
-      <div><label>Kilométrage</label><input id="f_km" type="number"></div>
-      <div><label>Marque / Modèle</label><input id="f_model"></div>
-      <div><label>Date</label><input id="f_date" type="date"></div>
-      <div><label>Client</label><input id="f_client"></div>
-      <div><label>Opérateur</label><input id="f_operator"></div>
-    </div>
+    <h3>Pièces prises</h3>
+    <table class="table" id="parts"></table>
+    <button id="addPart" class="primary">+ Ajouter une pièce</button>
 
-    <h3 style="margin-top:12px">FICHE DE CONTRÔLES</h3>
-    <div style="overflow:auto">
-      <table id="checkTable" class="table" style="min-width:880px">
-        <thead><tr><th>Rubrique / Contrôle</th><th>Bon état</th><th>À remettre en état</th><th>Commentaire</th></tr></thead>
-        <tbody id="checkBody"></tbody>
-      </table>
-    </div>
-
-    <h4 style="margin-top:12px">Pneumatiques</h4>
-    <table class="table">
-      <thead><tr><th>Roue</th><th>État</th><th>Pression</th></tr></thead>
-      <tbody id="tiresBody"></tbody>
-    </table>
-
-    <div class="form-grid" style="margin-top:12px">
-      <div><label>Travaux à faire</label><textarea id="f_todoNow"></textarea></div>
-      <div><label>Travaux à prévoir</label><textarea id="f_todoLater"></textarea></div>
-    </div>
-
-    <div style="margin-top:12px">
-      <label>Observations</label>
-      <textarea id="f_obs"></textarea>
-    </div>
-
-    <h4 style="margin-top:12px">Pièces prises / référencées</h4>
-    <table class="table">
-      <thead><tr><th>Réf</th><th>Désignation</th><th>Qté</th><th>Action</th></tr></thead>
-      <tbody id="partsBody"></tbody>
-    </table>
-    <div class="row"><button id="addPart" class="primary hidden">+ Ajouter une pièce</button></div>
+    <br><br>
+    <button id="btnSave" class="primary">Enregistrer</button>
+    <button id="btnBack">Retour</button>
   </div>
 </main>
 
 <footer class="footer">GC Perf — Fiches clients & contrôle véhicules</footer>
 
-<!-- ===== LOGIN ===== -->
+<!-- Connexion -->
 <div id="loginModal" class="hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)">
   <div style="background:#071018;padding:16px;border-radius:10px;border:1px solid #243041;min-width:320px">
     <h3>Connexion</h3>
-    <div class="form-grid" style="grid-template-columns:1fr">
-      <div><label>Email</label><input id="loginEmail" type="email"></div>
-      <div><label>Mot de passe</label><input id="loginPass" type="password"></div>
-    </div>
-    <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
-      <button id="loginCancel">Annuler</button>
-      <button id="loginSubmit" class="primary">Se connecter</button>
-    </div>
+    <input id="loginEmail" placeholder="Email"><br><br>
+    <input id="loginPass" type="password" placeholder="Mot de passe"><br><br>
+    <button id="loginSubmit" class="primary">Se connecter</button>
   </div>
 </div>
 
 <script>
-/* === CONFIG FIREBASE (projet fiche-client-24512) === */
 const firebaseConfig = {
   apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA",
   authDomain: "fiche-client-24512.firebaseapp.com",
@@ -170,19 +103,48 @@ const firebaseConfig = {
   appId: "1:808061975050:web:0a0c7753d3c32438c2fdf3",
   measurementId: "G-3ZHE8T2XJM"
 };
-
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* =========== Fonctions =========== */
-/* ... (ici on garde tout le script de gestion des fiches que je t’ai déjà fourni : 
-authentification, création/modif/suppression, génération du tableau de contrôles, pneus, pièces, etc.) ... */
+const $ = s => document.querySelector(s);
+let user=null;
+auth.onAuthStateChanged(u=>{
+  user=u;
+  $("#btnLogin").classList.toggle("hidden",!!u);
+  $("#btnLogout").classList.toggle("hidden",!u);
+  $("#btnNew").classList.toggle("hidden",!u);
+});
 
-/* Pour éviter d’envoyer un message trop long ici, 
-je te confirme que le reste du code JavaScript complet (création fiches, cases à cocher, Firestore sync, etc.)
-reste exactement le même que dans le fichier précédent que je t’ai donné. 
-Tu peux simplement coller la partie <script> de l’ancien fichier sous cette config. */
+$("#btnLogin").onclick=()=>$("#loginModal").classList.remove("hidden");
+$("#loginSubmit").onclick=async()=>{
+  try{
+    await auth.signInWithEmailAndPassword($("#loginEmail").value,$("#loginPass").value);
+    $("#loginModal").classList.add("hidden");
+    alert("Connecté !");
+  }catch(e){alert(e.message);}
+};
+$("#btnLogout").onclick=()=>auth.signOut();
+
+$("#btnNew").onclick=()=>{$("#editor").classList.remove("hidden");$("#list").classList.add("hidden");};
+$("#btnBack").onclick=()=>{$("#editor").classList.add("hidden");$("#list").classList.remove("hidden");};
+
+$("#btnSave").onclick=async()=>{
+  if(!user){alert("Connecte-toi !");return;}
+  const data={
+    immat:$("#f_immat").value,
+    km:$("#f_km").value,
+    model:$("#f_model").value,
+    client:$("#f_client").value,
+    operator:$("#f_operator").value,
+    todoNow:$("#f_todoNow").value,
+    todoLater:$("#f_todoLater").value,
+    createdAt:new Date().toISOString()
+  };
+  await db.collection("fiches").add(data);
+  alert("Fiche enregistrée !");
+  $("#editor").classList.add("hidden");$("#list").classList.remove("hidden");
+};
 </script>
 
 </body>
