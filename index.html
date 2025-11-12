@@ -5,382 +5,99 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>GC Perf — Fiches véhicules</title>
 
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ef233c">
-
-<!-- Firebase SDK (compat) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-<script>
-/* IMPORTANT (une seule fois) : désinscrire d’anciens SW qui cachaient l’ancienne app */
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).finally(()=>{
-    // Ré-enregistrer le SW propre
-    window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js'));
-  });
-}
-</script>
-
 <style>
-/* Thème carbone + rouge GC Perf */
-html,body{height:100%}
 body{
-  margin:0;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
-  background:
-    linear-gradient(45deg,rgba(0,0,0,.35)25%,transparent 25%,transparent 75%,rgba(0,0,0,.35)75%),
-    linear-gradient(45deg,rgba(0,0,0,.35)25%,transparent 25%,transparent 75%,rgba(0,0,0,.35)75%);
-  background-color:#0b0f16;background-size:22px 22px;background-position:0 0,11px 11px;
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+  color:#e5e7eb;
+  background:#0b0f16;
+  background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.05)0,rgba(255,255,255,.05)1px,transparent 2px,transparent 20px);
 }
-:root{--red:#ef233c;--panel:#0f172a;--muted:#9aa3b2;--stroke:#1f2937}
-header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:linear-gradient(180deg,#0f1116,#07080a);border-bottom:1px solid var(--stroke)}
-.header-left{display:flex;align-items:center;gap:12px}
-.badge{background:var(--red);padding:6px 10px;border-radius:999px;font-weight:700;color:#fff}
-main{max-width:1100px;margin:18px auto;padding:12px}
-.card{background:var(--panel);border:1px solid var(--stroke);border-radius:12px;padding:12px;margin-bottom:12px}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-button,input,select,textarea{padding:10px;border-radius:8px;border:1px solid #243041;background:#071018;color:#e5e7eb}
-button.primary{background:var(--red);border-color:#b91c1c}
-.list{display:grid;gap:10px}
-.item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;border:1px solid #19202a;background:#071018}
-.muted{color:var(--muted);font-size:13px}
-.table{width:100%;border-collapse:collapse}
-.table th,.table td{border-top:1px solid #23303a;padding:8px}
-.table th{background:#071221}
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;
+  background:#0f172a;border-bottom:1px solid #1f2937;
+}
+.badge{background:#ef233c;color:#fff;padding:6px 14px;border-radius:999px;font-weight:700}
+button,input{padding:10px;border-radius:8px;border:1px solid #243041;background:#071018;color:#e5e7eb}
+button.primary{background:#ef233c;border-color:#b91c1c}
 .hidden{display:none}
-.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-.footer{padding:10px;text-align:center;color:#9aa3b2;font-size:13px}
-.status-pill{font-size:12px;border:1px solid #334155;border-radius:999px;padding:2px 8px}
-.status-en_cours{color:#fde68a;border-color:#7c2d12}
-.status-termine{color:#bbf7d0;border-color:#14532d}
-@media print{
-  header, #btnNew, #btnLogin, #btnLogout, #btnDelete, #btnSave, #btnBack, #addPart { display:none !important }
-  body{background:#fff;color:#000}
-  .card{background:#fff;border-color:#ddd}
-  .table th,.table td{border-color:#ddd;color:#000}
+.card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:14px;margin:16px auto;max-width:800px}
+.modal{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.7);
+}
+.modal-box{
+  background:#0f172a;padding:24px;border-radius:12px;border:1px solid #243041;min-width:300px;
 }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="header-left">
-    <div class="badge">GC PERF</div>
-    <div><strong>Fiches véhicules</strong></div>
-  </div>
-  <div style="flex:1"></div>
-  <div class="row">
-    <button id="btnNew" class="primary hidden">+ Ajouter fiche</button>
-    <!-- inline onclick => ouvre le modal même si un autre JS a planté -->
-    <button id="btnLogin" onclick="document.getElementById('loginModal').classList.remove('hidden')">Connexion</button>
-    <button id="btnLogout" class="hidden">Se déconnecter</button>
+  <div class="badge">GC PERF</div>
+  <div>
+    <button id="btnLogout" class="hidden" onclick="logout()">Déconnexion</button>
   </div>
 </header>
 
 <main>
-  <!-- Filtres -->
   <div class="card">
-    <div class="row">
-      <input id="qImmat" placeholder="Rechercher immatriculation…" style="min-width:220px">
-      <select id="qStatus" style="min-width:160px">
-        <option value="">Tous</option>
-        <option value="en_cours">En cours</option>
-        <option value="termine">Terminé</option>
-      </select>
-      <div style="flex:1"></div>
-      <button id="btnExport">Exporter JSON</button>
-    </div>
-    <p class="muted" style="margin-top:8px">Lecture publique — connexion requise pour créer/éditer.</p>
-  </div>
-
-  <!-- LISTE PUBLIQUE -->
-  <div id="list" class="list"></div>
-  <p id="empty" class="muted">Aucun dossier</p>
-
-  <!-- ÉDITEUR -->
-  <div id="editor" class="card hidden">
-    <div class="row" style="justify-content:space-between">
-      <div><button id="btnBack">← Retour</button></div>
-      <div class="row">
-        <button id="btnDelete" class="hidden">Supprimer</button>
-        <button id="btnPDF">PDF</button>
-        <button id="btnSave" class="primary hidden">Enregistrer</button>
-      </div>
-    </div>
-
-    <h3>Identité véhicule</h3>
-    <div class="form-grid">
-      <div><label>Immatriculation</label><input id="f_immat"></div>
-      <div><label>Kilométrage (km)</label><input id="f_km" type="number" min="0"></div>
-      <div><label>Marque / Modèle</label><input id="f_model"></div>
-      <div><label>Date</label><input id="f_date" type="date"></div>
-      <div><label>Client</label><input id="f_client"></div>
-      <div><label>Opérateur</label><input id="f_operator"></div>
-      <div><label>Statut</label>
-        <select id="f_status">
-          <option value="en_cours">En cours</option>
-          <option value="termine">Terminé</option>
-        </select>
-      </div>
-    </div>
-
-    <h3 style="margin-top:12px">FICHE DE CONTRÔLES</h3>
-    <div style="overflow:auto">
-      <table id="checkTable" class="table" style="min-width:880px">
-        <thead><tr><th>Rubrique / Contrôle</th><th>Bon état apparent</th><th>À remettre en état</th><th>Commentaire</th></tr></thead>
-        <tbody id="checkBody"></tbody>
-      </table>
-    </div>
-
-    <h4 style="margin-top:12px">Pneumatiques</h4>
-    <table class="table">
-      <thead><tr><th>Roue</th><th>État</th><th>Pression (bar)</th></tr></thead>
-      <tbody id="tiresBody"></tbody>
-    </table>
-
-    <div class="form-grid" style="margin-top:12px">
-      <div><label>Travaux à faire</label><textarea id="f_todoNow" placeholder="- Vidange + filtre&#10;- Géométrie"></textarea></div>
-      <div><label>Travaux à prévoir</label><textarea id="f_todoLater" placeholder="- Pneus AV dans 5 000 km"></textarea></div>
-    </div>
-
-    <div style="margin-top:12px">
-      <label>Observations</label>
-      <textarea id="f_obs" placeholder="Remarques générales…"></textarea>
-    </div>
-
-    <h4 style="margin-top:12px">Pièces prises / référencées</h4>
-    <table class="table">
-      <thead><tr><th>Réf</th><th>Désignation</th><th>Qté</th><th>Action</th></tr></thead>
-      <tbody id="partsBody"></tbody>
-    </table>
-    <div class="row"><button id="addPart" class="primary hidden">+ Ajouter une pièce</button></div>
+    <h2>Fiches Véhicules</h2>
+    <p id="info">Veuillez entrer le mot de passe pour accéder aux fiches.</p>
+    <button id="btnNew" class="primary hidden">+ Nouvelle fiche</button>
   </div>
 </main>
 
-<footer class="footer">GC Perf — Fiches clients & contrôle véhicules</footer>
-
-<!-- MODAL CONNEXION -->
-<div id="loginModal" class="hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)">
-  <div style="background:#071018;padding:16px;border-radius:10px;border:1px solid #243041;min-width:320px">
-    <h3>Connexion</h3>
-    <div class="form-grid" style="grid-template-columns:1fr">
-      <div><label>Email</label><input id="loginEmail" type="email"></div>
-      <div><label>Mot de passe</label><input id="loginPass" type="password"></div>
+<!-- Fenêtre de mot de passe -->
+<div id="passwordModal" class="modal">
+  <div class="modal-box">
+    <h3>Accès sécurisé</h3>
+    <p>Entrer le mot de passe GC Perf :</p>
+    <input id="passwordInput" type="password" placeholder="Mot de passe" style="width:100%;margin-top:8px">
+    <div style="margin-top:10px;text-align:right">
+      <button class="primary" onclick="checkPassword()">Valider</button>
     </div>
-    <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
-      <button id="loginCancel" onclick="document.getElementById('loginModal').classList.add('hidden')">Annuler</button>
-      <button id="loginSubmit" class="primary" onclick="gcSignIn()">Se connecter</button>
-    </div>
+    <p id="errorMsg" style="color:#ef4444;font-size:13px;margin-top:8px;display:none">
+      Mot de passe incorrect ❌
+    </p>
   </div>
 </div>
 
 <script>
-/* === CONFIG FIREBASE (VALIDÉE par ton test-key.html) === */
-const firebaseConfig = {
-  apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA",
-  authDomain: "fiche-client-24512.firebaseapp.com",
-  projectId: "fiche-client-24512",
-  storageBucket: "fiche-client-24512.appspot.com", // <- IMPORTANT
-  messagingSenderId: "808061975050",
-  appId: "1:808061975050:web:0a0c7753d3c32438c2fdf3",
-  measurementId: "G-3ZHE8T2XJM"
-};
+// === Mot de passe fixe ===
+const PASSWORD = "GcPerf";
 
-try{
-  firebase.initializeApp(firebaseConfig);
-  console.log("✅ firebase.initializeApp OK");
-}catch(e){
-  console.error("❌ Erreur init Firebase:", e);
-  alert("Erreur init Firebase: " + (e.message||e));
-}
-
-const auth = firebase.auth();
-const db   = firebase.firestore();
-
-/* ===== Helpers ===== */
-const $ = s => document.querySelector(s);
-const el = (t,a={},...kids)=>{const e=document.createElement(t);for(const[k,v] of Object.entries(a)){if(k==='class')e.className=v;else if(k.startsWith('on')&&typeof v==='function')e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}kids.forEach(k=>k!=null&&e.appendChild(typeof k==='string'?document.createTextNode(k):k));return e;};
-
-/* ===== Checklist ===== */
-const CHECK_DEF = [
-  {cat:"VISIBILITÉ", items:[ "Contrôle des balais d’essuie-glace AV et AR", "Contrôle de l’état du pare-brise", "Contrôle des rétroviseurs" ]},
-  {cat:"IDENTIFICATION DU VÉHICULE", items:[ "État des plaques d’immatriculation (fixation AV et AR et lisibilité)" ]},
-  {cat:"ÉCLAIRAGE", items:[ "Feux de position","Feux de croisement","Feux de route","Feux stop","Feux antibrouillard AV et AR","Éclairage de recul","Clignotants","Feux de détresse" ]},
-  {cat:"VÉRIFICATION DES NIVEAUX", items:[ "Liquide lave-glace","Liquide de refroidissement","Contrôle du niveau de liquide de frein","Contrôle du niveau d’huile moteur" ]},
-  {cat:"FREINAGE", items:[ "Contrôle des plaquettes de frein","Contrôle des disques avant (sans dépose de roues)","Système d’assistance de freinage","Contrôle du témoin du niveau de liquide de frein" ]},
-  {cat:"DIRECTION", items:[ "Contrôle du système d’assistance de direction","Volant de direction" ]},
-  {cat:"AMORTISSEURS", items:[ "État des amortisseurs" ]},
-  {cat:"AUTRES", items:[ "Contrôle de l’état de l’échappement et des fixations","Contrôle du niveau du liquide de direction assistée","Contrôle de l’avertisseur sonore" ]},
-  {cat:"ÉQUIPEMENTS", items:[ "Support de roue de secours","Contrôle des ceintures de sécurité" ]},
-  {cat:"PNEUMATIQUES", items:[ "Pression des pneumatiques","État des pneumatiques" ]}
-];
-const TIRE_POS = ["AVG","AVD","ARG","ARD","RS"];
-
-/* ===== State ===== */
-let user=null, unsubscribeList=null, currentId=null, draft={checks:{},comments:{},pneus:[],pieces:[]};
-
-/* ===== Auth UI ===== */
-auth.onAuthStateChanged(u=>{
-  user=u||null;
-  $("#btnLogin")?.classList.toggle("hidden", !!user);
-  $("#btnLogout")?.classList.toggle("hidden", !user);
-  $("#btnNew")?.classList.toggle("hidden", !user);
-  attachList();
-});
-
-/* Connexion (inline) */
-function gcSignIn(){
-  const email=(document.getElementById('loginEmail').value||'').trim();
-  const pass =document.getElementById('loginPass').value||'';
-  if(!email||!pass){ alert('Email et mot de passe requis.'); return; }
-  auth.signInWithEmailAndPassword(email, pass)
-    .then(()=>{
-      document.getElementById('loginModal').classList.add('hidden');
-      alert('✅ Connecté !');
-    })
-    .catch(e=>{
-      console.error(e);
-      alert('Erreur connexion : ' + (e.code || e.message));
-    });
-}
-document.getElementById('btnLogout').onclick=()=>auth.signOut().then(()=>location.reload());
-
-/* ===== Liste publique ===== */
-function row(doc){
-  const d=doc.data();
-  const badge = el("span",{class:"status-pill " + (d.status==="termine"?"status-termine":"status-en_cours")}, d.status==="termine"?"Terminé":"En cours");
-  const left  = el("div",{}, el("div",{}, `${(d.immat||"").toUpperCase()} — ${d.model||"—"}`),
-                           el("div",{class:"muted"}, `Client: ${d.client||"—"} · KM: ${d.km||"—"} · ${d.date||"—"}`));
-  const open  = el("button",{onclick:()=>openEditor(doc.id)},"Ouvrir");
-  return el("div",{class:"item"}, left, el("div",{class:"row"}, badge, open));
-}
-function attachList(){
-  if(unsubscribeList) unsubscribeList();
-  let q = db.collection('fiches').orderBy('createdAt','desc');
-  const st=$("#qStatus")?.value; if(st) q=q.where('status','==',st);
-  unsubscribeList = q.onSnapshot(snap=>{
-    const list=$("#list"); list.innerHTML=""; let n=0;
-    const imm=($("#qImmat").value||"").toUpperCase();
-    snap.forEach(doc=>{
-      const d=doc.data();
-      if(imm && !(d.immat||"").toUpperCase().includes(imm)) return;
-      list.appendChild(row(doc)); n++;
-    });
-    $("#empty").classList.toggle("hidden", n>0);
-  }, err=> alert("Erreur liste: "+err.message));
-}
-["qImmat","qStatus"].forEach(id=> document.getElementById(id)?.addEventListener('input', attachList));
-
-/* ===== Éditeur ===== */
-function setEditor(v){
-  $("#editor").classList.toggle("hidden", !v);
-  $("#list").classList.toggle("hidden", v);
-  $("#empty").classList.toggle("hidden", v ? true : $("#list").children.length>0);
-}
-function buildChecklist(checks={},comments={}){
-  const body=$("#checkBody"); body.innerHTML="";
-  CHECK_DEF.forEach(g=>{
-    body.appendChild(el("tr",{}, el("th",{colspan:"4"}, g.cat)));
-    g.items.forEach(txt=>{
-      const key=g.cat+" | "+txt;
-      const ok =el("input",{type:"radio",name:key, ...(checks[key]==='ok'?{checked:true}:{})});
-      const ko =el("input",{type:"radio",name:key, ...(checks[key]==='bad'?{checked:true}:{})});
-      const com=el("input",{type:"text",value:comments[key]||"",placeholder:"Commentaire (optionnel)"});
-      ok.addEventListener("change",()=> draft.checks[key]='ok');
-      ko.addEventListener("change",()=> draft.checks[key]='bad');
-      com.addEventListener("change",()=> draft.comments[key]=com.value.trim());
-      const tr=el("tr",{}, el("td",{},txt), el("td",{},ok), el("td",{},ko), el("td",{},com));
-      tr.addEventListener("dblclick",()=>{ ok.checked=false; ko.checked=false; com.value=""; delete draft.checks[key]; delete draft.comments[key]; });
-      body.appendChild(tr);
-    });
-  });
-}
-function buildTires(p=[]){
-  const tb=$("#tiresBody"); tb.innerHTML="";
-  TIRE_POS.forEach(pos=>{
-    const row=p.find(x=>x.pos===pos)||{etat:"Bon",pression:""};
-    const sel=el("select",{},...["Bon","Moyen","À remplacer"].map(s=>el("option",{value:s, ...(row.etat===s?{selected:true}:{})},s)));
-    const pr =el("input",{type:"number",step:"0.1",min:"0",value:row.pression||""});
-    sel.addEventListener("change",()=>{const r=draft.pneus.find(x=>x.pos===pos); if(r) r.etat=sel.value; else draft.pneus.push({pos,etat:sel.value,pression:pr.value});});
-    pr.addEventListener("change",()=>{const r=draft.pneus.find(x=>x.pos===pos); if(r) r.pression=pr.value; else draft.pneus.push({pos,etat:sel.value,pression:pr.value});});
-    tb.appendChild(el("tr",{}, el("td",{},pos), el("td",{},sel), el("td",{},pr)));
-  });
-}
-function addPartRow(ref="",label="",q="1"){
-  const tr=el("tr");
-  tr.innerHTML=`<td><input value="${ref}" placeholder="Réf"></td>
-                <td><input value="${label}" placeholder="Désignation"></td>
-                <td><input value="${q}" type="number" min="0" step="1"></td>
-                <td><button onclick="this.closest('tr').remove()">Supprimer</button></td>`;
-  $("#partsBody").appendChild(tr);
-}
-
-async function openEditor(id){
-  if(!user){ alert("Connecte-toi pour éditer."); return; }
-  setEditor(true);
-  currentId=id||null;
-  draft={checks:{},comments:{},pneus:[],pieces:[]};
-  $("#partsBody").innerHTML="";
-  if(id){
-    const snap=await db.collection('fiches').doc(id).get();
-    if(!snap.exists){ alert("Fiche introuvable."); setEditor(false); return; }
-    const d=snap.data();
-    $("#f_immat").value=d.immat||""; $("#f_km").value=d.km||""; $("#f_model").value=d.model||""; $("#f_date").value=d.date||"";
-    $("#f_client").value=d.client||""; $("#f_operator").value=d.operator||""; $("#f_status").value=d.status||"en_cours";
-    $("#f_todoNow").value=(d.todoNow||[]).join("\n"); $("#f_todoLater").value=(d.todoLater||[]).join("\n"); $("#f_obs").value=d.obs||"";
-    draft.checks={...(d.checks||{})}; draft.comments={...(d.comments||{})}; draft.pneus=Array.isArray(d.pneus)?[...d.pneus]:[];
-    (d.pieces||[]).forEach(p=>addPartRow(p.ref,p.label,p.qte));
+function checkPassword(){
+  const input = document.getElementById('passwordInput').value.trim();
+  if(input === PASSWORD){
+    document.getElementById('passwordModal').style.display = "none";
+    document.getElementById('btnNew').classList.remove('hidden');
+    document.getElementById('btnLogout').classList.remove('hidden');
+    document.getElementById('info').textContent = "Accès autorisé ✅";
+    localStorage.setItem("gcperf_logged", "1");
   }else{
-    $("#f_immat").value=""; $("#f_km").value=""; $("#f_model").value=""; $("#f_date").value="";
-    $("#f_client").value=""; $("#f_operator").value=""; $("#f_status").value="en_cours";
-    $("#f_todoNow").value=""; $("#f_todoLater").value=""; $("#f_obs").value="";
-    addPartRow();
+    const msg = document.getElementById('errorMsg');
+    msg.style.display = "block";
+    setTimeout(()=> msg.style.display="none", 2000);
   }
-  buildChecklist(draft.checks, draft.comments);
-  buildTires(draft.pneus);
-  document.getElementById("btnSave").classList.toggle("hidden",!user);
-  document.getElementById("addPart").classList.toggle("hidden",!user);
-  document.getElementById("btnDelete").classList.toggle("hidden", false);
 }
-function closeEditor(){ setEditor(false); attachList(); currentId=null; draft={checks:{},comments:{},pneus:[],pieces:[]}; }
 
-async function saveFiche(){
-  if(!user){ alert("Connecte-toi."); return; }
-  const immat=($("#f_immat").value||"").trim().toUpperCase(); if(!immat){ alert("Immatriculation requise"); return; }
-  const pieces = Array.from(document.querySelectorAll("#partsBody tr")).map(tr=>{
-    const [r,l,q]=tr.querySelectorAll("input"); return {ref:(r.value||"").trim(), label:(l.value||"").trim(), qte:(q.value||"").trim()};
-  }).filter(p=>p.ref||p.label||p.qte);
-  const data={
-    immat, model:($("#f_model").value||"").trim(), client:($("#f_client").value||"").trim(),
-    km: $("#f_km").value? Number($("#f_km").value):null, date: $("#f_date").value || new Date().toISOString().slice(0,10),
-    operator:($("#f_operator").value||"").trim(), status: $("#f_status").value || "en_cours",
-    todoNow: ($("#f_todoNow").value||"").split("\n").map(s=>s.trim()).filter(Boolean),
-    todoLater: ($("#f_todoLater").value||"").split("\n").map(s=>s.trim()).filter(Boolean),
-    obs: ($("#f_obs").value||"").trim(),
-    checks: draft.checks, comments: draft.comments, pneus: draft.pneus, pieces
-  };
-  if(currentId){ await db.collection('fiches').doc(currentId).update(data); }
-  else { await db.collection('fiches').add({ ...data, createdBy: auth.currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); }
-  alert("Fiche enregistrée."); closeEditor();
+function logout(){
+  localStorage.removeItem("gcperf_logged");
+  location.reload();
 }
-async function deleteFiche(id){ if(!confirm("Supprimer cette fiche ?")) return; try{ await db.collection('fiches').doc(id).delete(); alert("Supprimé."); closeEditor(); }catch(e){ alert("Suppression refusée (admin)."); }}
 
-/* Boutons */
-$("#btnNew").addEventListener("click", ()=>openEditor(null));
-$("#btnBack").addEventListener("click", closeEditor);
-$("#btnSave").addEventListener("click", saveFiche);
-$("#btnDelete").addEventListener("click", async()=>{ if(currentId){ await deleteFiche(currentId); } });
-$("#btnPDF").addEventListener("click", ()=>window.print());
-$("#addPart").addEventListener("click", ()=>addPartRow());
-
-/* Export JSON */
-$("#btnExport").addEventListener("click", async ()=>{
-  const snap=await db.collection('fiches').orderBy('createdAt','desc').get();
-  const arr=snap.docs.map(d=>({id:d.id,...d.data()}));
-  const blob=new Blob([JSON.stringify(arr,null,2)],{type:"application/json"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="gcperf_fiches.json"; a.click(); URL.revokeObjectURL(a.href);
+// Persistance locale (si déjà connecté)
+window.addEventListener("load", ()=>{
+  if(localStorage.getItem("gcperf_logged") === "1"){
+    document.getElementById('passwordModal').style.display = "none";
+    document.getElementById('btnNew').classList.remove('hidden');
+    document.getElementById('btnLogout').classList.remove('hidden');
+    document.getElementById('info').textContent = "Accès autorisé ✅";
+  }
 });
 </script>
+
 </body>
 </html>
