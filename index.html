@@ -68,13 +68,12 @@ button.primary{background:var(--red);border-color:#b91c1c}
   <div style="flex:1"></div>
   <div class="row">
     <button id="btnNew" class="primary hidden">+ Ajouter fiche</button>
-    <button id="btnLogin">Connexion</button>
+    <button id="btnLogin" onclick="document.getElementById('loginModal').classList.remove('hidden')">Connexion</button>
     <button id="btnLogout" class="hidden">Se déconnecter</button>
   </div>
 </header>
 
 <main>
-  <!-- Filtres -->
   <div class="card">
     <div class="row">
       <input id="qImmat" placeholder="Rechercher immatriculation…" style="min-width:220px">
@@ -89,11 +88,9 @@ button.primary{background:var(--red);border-color:#b91c1c}
     <p class="muted" style="margin-top:8px">Lecture publique — connexion requise pour créer/éditer.</p>
   </div>
 
-  <!-- LISTE -->
   <div id="list" class="list"></div>
   <p id="empty" class="muted">Aucun dossier</p>
 
-  <!-- ÉDITEUR -->
   <div id="editor" class="card hidden">
     <div class="row" style="justify-content:space-between">
       <div><button id="btnBack">← Retour</button></div>
@@ -164,14 +161,14 @@ button.primary{background:var(--red);border-color:#b91c1c}
       <div><label>Mot de passe</label><input id="loginPass" type="password"></div>
     </div>
     <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
-      <button id="loginCancel">Annuler</button>
-      <button id="loginSubmit" class="primary">Se connecter</button>
+      <button id="loginCancel" onclick="document.getElementById('loginModal').classList.add('hidden')">Annuler</button>
+      <button id="loginSubmit" class="primary" onclick="gcSignIn()">Se connecter</button>
     </div>
   </div>
 </div>
 
 <script>
-/* === CONFIG FIREBASE (fiche-client-24512) === */
+/* === CONFIG FIREBASE === */
 const firebaseConfig = {
   apiKey: "AIzaSyB0dMHGvqJiwMTbbpWdNn3MdGSTVBihxqA",
   authDomain: "fiche-client-24512.firebaseapp.com",
@@ -179,244 +176,41 @@ const firebaseConfig = {
   storageBucket: "fiche-client-24512.firebasestorage.app",
   messagingSenderId: "808061975050",
   appId: "1:808061975050:web:0a0c7753d3c32438c2fdf3",
-  measurementId: "G-3ZHE8T2XJM"
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-if (db.enablePersistence) { db.enablePersistence().catch(()=>{}); }
 
-/* ===== Helpers ===== */
-const $ = s => document.querySelector(s);
-const el = (t,a={},...kids)=>{const e=document.createElement(t);for(const[k,v] of Object.entries(a)){if(k==='class')e.className=v;else if(k.startsWith('on')&&typeof v==='function')e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}kids.forEach(k=>k!=null&&e.appendChild(typeof k==='string'?document.createTextNode(k):k));return e;};
-
-/* ===== Sécurité: voir toute erreur JS ===== */
-window.addEventListener('error', (e)=>{ console.error(e.message, e); alert("Erreur JS: " + e.message); });
-
-/* ===== Checklist (calquée sur ta feuille) ===== */
-const CHECK_DEF = [
-  {cat:"VISIBILITÉ", items:[ "Contrôle des balais d’essuie-glace AV et AR", "Contrôle de l’état du pare-brise", "Contrôle des rétroviseurs" ]},
-  {cat:"IDENTIFICATION DU VÉHICULE", items:[ "État des plaques d’immatriculation (fixation AV et AR et lisibilité)" ]},
-  {cat:"ÉCLAIRAGE", items:[ "Feux de position","Feux de croisement","Feux de route","Feux stop","Feux antibrouillard AV et AR","Éclairage de recul","Clignotants","Feux de détresse" ]},
-  {cat:"VÉRIFICATION DES NIVEAUX", items:[ "Liquide lave-glace","Liquide de refroidissement","Contrôle du niveau de liquide de frein","Contrôle du niveau d’huile moteur" ]},
-  {cat:"FREINAGE", items:[ "Contrôle des plaquettes de frein","Contrôle des disques avant (sans dépose de roues)","Système d’assistance de freinage","Contrôle du témoin du niveau de liquide de frein" ]},
-  {cat:"DIRECTION", items:[ "Contrôle du système d’assistance de direction","Volant de direction" ]},
-  {cat:"AMORTISSEURS", items:[ "État des amortisseurs" ]},
-  {cat:"AUTRES", items:[ "Contrôle de l’état de l’échappement et des fixations","Contrôle du niveau du liquide de direction assistée","Contrôle de l’avertisseur sonore" ]},
-  {cat:"ÉQUIPEMENTS", items:[ "Support de roue de secours","Contrôle des ceintures de sécurité" ]},
-  {cat:"PNEUMATIQUES", items:[ "Pression des pneumatiques","État des pneumatiques" ]}
-];
-const TIRE_POS = ["AVG","AVD","ARG","ARD","RS"];
-
-/* ===== État global ===== */
-let user=null, unsubscribeList=null, currentId=null, draft={checks:{},comments:{},pneus:[],pieces:[]};
-
-/* ===== Auth: réactions UI ===== */
-auth.onAuthStateChanged((u)=>{
-  user = u || null;
-  $("#btnLogin")?.classList.toggle("hidden", !!user);
-  $("#btnLogout")?.classList.toggle("hidden", !user);
-  $("#btnNew")?.classList.toggle("hidden", !user);
-  attachList();
-});
-
-/* ===== Listeners robustes (connexion incluse) ===== */
-document.addEventListener('DOMContentLoaded', () => {
-  const modal = $("#loginModal");
-  $("#btnLogin")?.addEventListener('click', ()=> modal.classList.remove('hidden'));
-  $("#loginCancel")?.addEventListener('click', ()=> modal.classList.add('hidden'));
-  $("#loginSubmit")?.addEventListener('click', async ()=>{
-    try{
-      const email=($("#loginEmail").value||"").trim();
-      const pass = $("#loginPass").value||"";
-      if(!email || !pass){ alert("Email et mot de passe requis."); return; }
-      const res=await auth.signInWithEmailAndPassword(email, pass);
-      console.log("signed in:", res.user?.uid);
-      modal.classList.add('hidden');
-      alert("Connecté !");
-    }catch(e){ console.error(e); alert("Erreur de connexion: " + (e.code || e.message)); }
-  });
-  $("#btnLogout")?.addEventListener('click', ()=> auth.signOut().catch(e=>alert(e.message)));
-
-  $("#btnNew")?.addEventListener('click', ()=> openEditor(null));
-  $("#btnBack")?.addEventListener('click', ()=> closeEditor());
-  $("#btnSave")?.addEventListener('click', ()=> saveFiche());
-  $("#btnDelete")?.addEventListener('click', async ()=>{ if(currentId){ await deleteFiche(currentId); }});
-  $("#btnPDF")?.addEventListener('click', ()=> window.print());
-  $("#addPart")?.addEventListener('click', ()=> addPartRow());
-
-  ["qImmat","qStatus"].forEach(id=> document.getElementById(id)?.addEventListener('input', attachList));
-});
-
-/* ===== Liste publique ===== */
-function buildRow(doc){
-  const d=doc.data();
-  const badge = el("span",{class:"status-pill " + (d.status==="termine"?"status-termine":"status-en_cours")}, d.status==="termine"?"Terminé":"En cours");
-  const left  = el("div",{}, el("div",{}, `${(d.immat||"").toUpperCase()} — ${d.model||"—"}`),
-                           el("div",{class:"muted"}, `Client: ${d.client||"—"} · KM: ${d.km||"—"} · ${d.date||"—"}`));
-  const open  = el("button",{onclick:()=>openEditor(doc.id)},"Ouvrir");
-  return el("div",{class:"item"}, left, el("div",{class:"row"}, badge, open));
+/* ==== Connexion simple ==== */
+function gcSignIn(){
+  try{
+    const email=(document.getElementById('loginEmail').value||'').trim();
+    const pass=document.getElementById('loginPass').value||'';
+    if(!email||!pass){alert('Email et mot de passe requis.');return;}
+    auth.signInWithEmailAndPassword(email,pass)
+      .then(()=>{
+        document.getElementById('loginModal').classList.add('hidden');
+        alert('Connecté !');
+        document.getElementById('btnLogin').classList.add('hidden');
+        document.getElementById('btnLogout').classList.remove('hidden');
+        document.getElementById('btnNew').classList.remove('hidden');
+      })
+      .catch(e=>alert('Erreur connexion: '+(e.code||e.message)));
+  }catch(err){alert('Erreur JS: '+err.message);}
 }
-function attachList(){
-  if(!db) return;
-  if(unsubscribeList) unsubscribeList();
-  let q = db.collection('fiches').orderBy('createdAt','desc');
-  const st=$("#qStatus")?.value; if(st) q=q.where('status','==',st);
-  unsubscribeList = q.onSnapshot(snap=>{
-    const list=$("#list"); list.innerHTML=""; let n=0;
-    const imm = ($("#qImmat").value||"").toUpperCase();
-    snap.forEach(doc=>{
-      const d=doc.data();
-      if(imm && !(d.immat||"").toUpperCase().includes(imm)) return;
-      list.appendChild(buildRow(doc)); n++;
-    });
-    $("#empty").classList.toggle("hidden", n>0);
-  }, err=> alert("Erreur liste: "+err.message));
-}
+document.getElementById('btnLogout').onclick=()=>auth.signOut().then(()=>location.reload());
 
-/* ===== Construction tableaux ===== */
-function buildChecklist(checks={}, comments={}){
-  const body=$("#checkBody"); body.innerHTML="";
-  CHECK_DEF.forEach(group=>{
-    body.appendChild(el("tr",{}, el("th",{colspan:"4"}, group.cat)));
-    group.items.forEach(txt=>{
-      const key = group.cat + " | " + txt;
-      const ok  = el("input",{type:"radio",name:key, ...(checks[key]==='ok'?{checked:true}:{})});
-      const bad = el("input",{type:"radio",name:key, ...(checks[key]==='bad'?{checked:true}:{})});
-      const com = el("input",{type:"text",value:comments[key]||"",placeholder:"Commentaire (optionnel)"});
-      ok.addEventListener("change", ()=> draft.checks[key]='ok');
-      bad.addEventListener("change", ()=> draft.checks[key]='bad');
-      com.addEventListener("change", ()=> draft.comments[key]=com.value.trim());
-      const tr = el("tr",{}, el("td",{}, txt), el("td",{}, ok), el("td",{}, bad), el("td",{}, com));
-      tr.addEventListener("dblclick", ()=>{ ok.checked=false; bad.checked=false; com.value=""; delete draft.checks[key]; delete draft.comments[key]; });
-      body.appendChild(tr);
-    });
-  });
+/* ===== FONCTIONS ===== */
+function addPartRow(){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input placeholder='Réf'></td>
+                <td><input placeholder='Désignation'></td>
+                <td><input type='number' min='0' value='1'></td>
+                <td><button onclick='this.closest("tr").remove()'>Supprimer</button></td>`;
+  document.getElementById('partsBody').appendChild(tr);
 }
-function buildTires(pneus=[]){
-  const tb=$("#tiresBody"); tb.innerHTML="";
-  TIRE_POS.forEach(pos=>{
-    const row = pneus.find(p=>p.pos===pos) || {etat:"Bon", pression:""};
-    const sel = el("select",{}, ...["Bon","Moyen","À remplacer"].map(s=>el("option",{value:s, ...(row.etat===s?{selected:true}:{})}, s)));
-    const pr  = el("input",{type:"number",step:"0.1",min:"0",placeholder:"2.3", value: row.pression||""});
-    sel.addEventListener("change", ()=>{ const p=draft.pneus.find(x=>x.pos===pos); if(p) p.etat=sel.value; else draft.pneus.push({pos,etat:sel.value,pression:pr.value}); });
-    pr.addEventListener("change",  ()=>{ const p=draft.pneus.find(x=>x.pos===pos); if(p) p.pression=pr.value; else draft.pneus.push({pos,etat:sel.value,pression:pr.value}); });
-    tb.appendChild(el("tr",{}, el("td",{}, pos), el("td",{}, sel), el("td",{}, pr)));
-  });
-}
-function addPartRow(ref="",label="",qte="1"){
-  const tr = el("tr");
-  const rI = el("input",{value:ref,placeholder:"Réf."});
-  const lI = el("input",{value:label,placeholder:"Désignation"});
-  const qI = el("input",{value:qte,type:"number",min:"0",step:"1"});
-  const del= el("button",{onclick:()=>tr.remove()},"Supprimer");
-  tr.append(el("td",{},rI), el("td",{},lI), el("td",{},qI), el("td",{},del));
-  $("#partsBody").appendChild(tr);
-}
-
-/* ===== Éditeur ===== */
-async function openEditor(id){
-  if(!user){ alert("Connecte-toi pour éditer."); return; }
-  setEditorVisible(true);
-  currentId = id || null;
-  draft = {checks:{},comments:{},pneus:[],pieces:[]};
-  $("#partsBody").innerHTML="";
-  if(currentId){
-    const snap = await db.collection('fiches').doc(currentId).get();
-    if(!snap.exists){ alert("Fiche introuvable."); setEditorVisible(false); return; }
-    const d = snap.data();
-    $("#f_immat").value=d.immat||"";
-    $("#f_km").value=d.km||"";
-    $("#f_model").value=d.model||"";
-    $("#f_date").value=d.date||"";
-    $("#f_client").value=d.client||"";
-    $("#f_operator").value=d.operator||"";
-    $("#f_status").value=d.status||"en_cours";
-    $("#f_todoNow").value=(d.todoNow||[]).join("\n");
-    $("#f_todoLater").value=(d.todoLater||[]).join("\n");
-    $("#f_obs").value=d.obs||"";
-    draft.checks = {...(d.checks||{})};
-    draft.comments = {...(d.comments||{})};
-    draft.pneus = Array.isArray(d.pneus)? [...d.pneus] : [];
-    (d.pieces||[]).forEach(p=>addPartRow(p.ref,p.label,p.qte));
-  }else{
-    $("#f_immat").value=""; $("#f_km").value=""; $("#f_model").value=""; $("#f_date").value="";
-    $("#f_client").value=""; $("#f_operator").value=""; $("#f_status").value="en_cours";
-    $("#f_todoNow").value=""; $("#f_todoLater").value=""; $("#f_obs").value="";
-    addPartRow();
-  }
-  buildChecklist(draft.checks, draft.comments);
-  buildTires(draft.pneus);
-  document.getElementById("btnSave").classList.toggle("hidden",!user);
-  document.getElementById("addPart").classList.toggle("hidden",!user);
-  document.getElementById("btnDelete").classList.toggle("hidden", false);
-}
-function setEditorVisible(v){
-  $("#editor").classList.toggle("hidden", !v);
-  $("#list").classList.toggle("hidden", v);
-  $("#empty").classList.toggle("hidden", v ? true : $("#list").children.length>0);
-}
-function closeEditor(){
-  setEditorVisible(false);
-  attachList();
-  currentId=null;
-  draft = {checks:{},comments:{},pneus:[],pieces:[]};
-}
-
-async function saveFiche(){
-  if(!user){ alert("Connecte-toi."); return; }
-  const immat = ($("#f_immat").value||"").trim().toUpperCase();
-  if(!immat){ alert("Immatriculation obligatoire"); return; }
-  const pieces = Array.from(document.querySelectorAll("#partsBody tr")).map(tr=>{
-    const [r,l,q]=tr.querySelectorAll("input"); return {ref:(r.value||"").trim(), label:(l.value||"").trim(), qte:(q.value||"").trim()};
-  }).filter(p=>p.ref||p.label||p.qte);
-
-  const data = {
-    immat,
-    model: $("#f_model").value.trim(),
-    client: $("#f_client").value.trim(),
-    km: $("#f_km").value? Number($("#f_km").value) : null,
-    status: $("#f_status").value || "en_cours",
-    date: $("#f_date").value || new Date().toISOString().slice(0,10),
-    operator: $("#f_operator").value.trim(),
-    todoNow: ($("#f_todoNow").value||"").split("\n").map(s=>s.trim()).filter(Boolean),
-    todoLater: ($("#f_todoLater").value||"").split("\n").map(s=>s.trim()).filter(Boolean),
-    obs: $("#f_obs").value.trim(),
-    checks: draft.checks,
-    comments: draft.comments,
-    pneus: draft.pneus,
-    pieces
-  };
-
-  if(currentId){
-    await db.collection('fiches').doc(currentId).update(data);
-  }else{
-    await db.collection('fiches').add({
-      ...data,
-      createdBy: auth.currentUser.uid,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  }
-  alert("Fiche enregistrée.");
-  closeEditor();
-}
-
-async function deleteFiche(id){
-  if(!confirm("Supprimer cette fiche ?")) return;
-  try{ await db.collection('fiches').doc(id).delete(); alert("Supprimé."); closeEditor(); }
-  catch(e){ alert("Suppression refusée (réservée admin)."); }
-}
-
-/* ===== Export JSON ===== */
-document.getElementById("btnExport").addEventListener("click", async ()=>{
-  const snap = await db.collection('fiches').orderBy('createdAt','desc').get();
-  const arr = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  const blob = new Blob([JSON.stringify(arr,null,2)], {type:"application/json"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="gcperf_fiches.json"; a.click(); URL.revokeObjectURL(a.href);
-});
-
-/* ===== PDF ===== */
-document.getElementById("btnPDF").addEventListener("click", ()=> window.print());
+document.getElementById('addPart').onclick=addPartRow;
+document.getElementById('btnPDF').onclick=()=>window.print();
 </script>
 </body>
 </html>
