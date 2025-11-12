@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ef233c">
 
-<!-- Firebase SDK (compat pour simplicité) -->
+<!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -74,7 +74,7 @@ button.primary{background:var(--red);border-color:#b91c1c}
 </header>
 
 <main>
-  <!-- Barre filtres / export -->
+  <!-- Filtres -->
   <div class="card">
     <div class="row">
       <input id="qImmat" placeholder="Rechercher immatriculation…" style="min-width:220px">
@@ -89,7 +89,7 @@ button.primary{background:var(--red);border-color:#b91c1c}
     <p class="muted" style="margin-top:8px">Lecture publique — connexion requise pour créer/éditer.</p>
   </div>
 
-  <!-- LISTE PUBLIQUE -->
+  <!-- LISTE -->
   <div id="list" class="list"></div>
   <p id="empty" class="muted">Aucun dossier</p>
 
@@ -184,12 +184,14 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-// Persistance hors-ligne (best effort)
 if (db.enablePersistence) { db.enablePersistence().catch(()=>{}); }
 
 /* ===== Helpers ===== */
 const $ = s => document.querySelector(s);
 const el = (t,a={},...kids)=>{const e=document.createElement(t);for(const[k,v] of Object.entries(a)){if(k==='class')e.className=v;else if(k.startsWith('on')&&typeof v==='function')e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}kids.forEach(k=>k!=null&&e.appendChild(typeof k==='string'?document.createTextNode(k):k));return e;};
+
+/* ===== Sécurité: voir toute erreur JS ===== */
+window.addEventListener('error', (e)=>{ console.error(e.message, e); alert("Erreur JS: " + e.message); });
 
 /* ===== Checklist (calquée sur ta feuille) ===== */
 const CHECK_DEF = [
@@ -209,42 +211,70 @@ const TIRE_POS = ["AVG","AVD","ARG","ARD","RS"];
 /* ===== État global ===== */
 let user=null, unsubscribeList=null, currentId=null, draft={checks:{},comments:{},pneus:[],pieces:[]};
 
-/* ===== Auth ===== */
-auth.onAuthStateChanged(async (u)=>{
+/* ===== Auth: réactions UI ===== */
+auth.onAuthStateChanged((u)=>{
   user = u || null;
-  $("#btnLogin").classList.toggle("hidden", !!user);
-  $("#btnLogout").classList.toggle("hidden", !user);
-  $("#btnNew").classList.toggle("hidden", !user);
+  $("#btnLogin")?.classList.toggle("hidden", !!user);
+  $("#btnLogout")?.classList.toggle("hidden", !user);
+  $("#btnNew")?.classList.toggle("hidden", !user);
+  attachList();
 });
 
-/* ===== Liste publique (realtime) ===== */
+/* ===== Listeners robustes (connexion incluse) ===== */
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = $("#loginModal");
+  $("#btnLogin")?.addEventListener('click', ()=> modal.classList.remove('hidden'));
+  $("#loginCancel")?.addEventListener('click', ()=> modal.classList.add('hidden'));
+  $("#loginSubmit")?.addEventListener('click', async ()=>{
+    try{
+      const email=($("#loginEmail").value||"").trim();
+      const pass = $("#loginPass").value||"";
+      if(!email || !pass){ alert("Email et mot de passe requis."); return; }
+      const res=await auth.signInWithEmailAndPassword(email, pass);
+      console.log("signed in:", res.user?.uid);
+      modal.classList.add('hidden');
+      alert("Connecté !");
+    }catch(e){ console.error(e); alert("Erreur de connexion: " + (e.code || e.message)); }
+  });
+  $("#btnLogout")?.addEventListener('click', ()=> auth.signOut().catch(e=>alert(e.message)));
+
+  $("#btnNew")?.addEventListener('click', ()=> openEditor(null));
+  $("#btnBack")?.addEventListener('click', ()=> closeEditor());
+  $("#btnSave")?.addEventListener('click', ()=> saveFiche());
+  $("#btnDelete")?.addEventListener('click', async ()=>{ if(currentId){ await deleteFiche(currentId); }});
+  $("#btnPDF")?.addEventListener('click', ()=> window.print());
+  $("#addPart")?.addEventListener('click', ()=> addPartRow());
+
+  ["qImmat","qStatus"].forEach(id=> document.getElementById(id)?.addEventListener('input', attachList));
+});
+
+/* ===== Liste publique ===== */
 function buildRow(doc){
   const d=doc.data();
   const badge = el("span",{class:"status-pill " + (d.status==="termine"?"status-termine":"status-en_cours")}, d.status==="termine"?"Terminé":"En cours");
-  const left = el("div",{}, el("div",{}, `${(d.immat||"").toUpperCase()} — ${d.model||"—"}`),
+  const left  = el("div",{}, el("div",{}, `${(d.immat||"").toUpperCase()} — ${d.model||"—"}`),
                            el("div",{class:"muted"}, `Client: ${d.client||"—"} · KM: ${d.km||"—"} · ${d.date||"—"}`));
-  const open = el("button",{onclick:()=>openEditor(doc.id)},"Ouvrir");
+  const open  = el("button",{onclick:()=>openEditor(doc.id)},"Ouvrir");
   return el("div",{class:"item"}, left, el("div",{class:"row"}, badge, open));
 }
 function attachList(){
+  if(!db) return;
   if(unsubscribeList) unsubscribeList();
   let q = db.collection('fiches').orderBy('createdAt','desc');
-  const st = $("#qStatus").value; if(st) q = q.where('status','==',st);
+  const st=$("#qStatus")?.value; if(st) q=q.where('status','==',st);
   unsubscribeList = q.onSnapshot(snap=>{
-    const list = $("#list"); list.innerHTML=""; let count=0;
+    const list=$("#list"); list.innerHTML=""; let n=0;
     const imm = ($("#qImmat").value||"").toUpperCase();
     snap.forEach(doc=>{
       const d=doc.data();
       if(imm && !(d.immat||"").toUpperCase().includes(imm)) return;
-      list.appendChild(buildRow(doc)); count++;
+      list.appendChild(buildRow(doc)); n++;
     });
-    $("#empty").classList.toggle("hidden", count>0);
-  }, err=> alert("Erreur lecture: "+err.message));
+    $("#empty").classList.toggle("hidden", n>0);
+  }, err=> alert("Erreur liste: "+err.message));
 }
-["qImmat","qStatus"].forEach(id=>$("#"+id).addEventListener("input", attachList));
-attachList();
 
-/* ===== Construction des tableaux ===== */
+/* ===== Construction tableaux ===== */
 function buildChecklist(checks={}, comments={}){
   const body=$("#checkBody"); body.innerHTML="";
   CHECK_DEF.forEach(group=>{
@@ -254,9 +284,9 @@ function buildChecklist(checks={}, comments={}){
       const ok  = el("input",{type:"radio",name:key, ...(checks[key]==='ok'?{checked:true}:{})});
       const bad = el("input",{type:"radio",name:key, ...(checks[key]==='bad'?{checked:true}:{})});
       const com = el("input",{type:"text",value:comments[key]||"",placeholder:"Commentaire (optionnel)"});
-      ok.addEventListener("change", ()=>{ draft.checks[key]='ok'; });
-      bad.addEventListener("change", ()=>{ draft.checks[key]='bad'; });
-      com.addEventListener("change", ()=>{ draft.comments[key]=com.value.trim(); });
+      ok.addEventListener("change", ()=> draft.checks[key]='ok');
+      bad.addEventListener("change", ()=> draft.checks[key]='bad');
+      com.addEventListener("change", ()=> draft.comments[key]=com.value.trim());
       const tr = el("tr",{}, el("td",{}, txt), el("td",{}, ok), el("td",{}, bad), el("td",{}, com));
       tr.addEventListener("dblclick", ()=>{ ok.checked=false; bad.checked=false; com.value=""; delete draft.checks[key]; delete draft.comments[key]; });
       body.appendChild(tr);
@@ -285,15 +315,6 @@ function addPartRow(ref="",label="",qte="1"){
 }
 
 /* ===== Éditeur ===== */
-let currentId=null;
-let draft = {checks:{},comments:{},pneus:[],pieces:[]};
-
-function setEditorVisible(v){
-  $("#editor").classList.toggle("hidden", !v);
-  $("#list").classList.toggle("hidden", v);
-  $("#empty").classList.toggle("hidden", v ? true : $("#list").children.length>0);
-}
-
 async function openEditor(id){
   if(!user){ alert("Connecte-toi pour éditer."); return; }
   setEditorVisible(true);
@@ -328,10 +349,13 @@ async function openEditor(id){
   buildTires(draft.pneus);
   document.getElementById("btnSave").classList.toggle("hidden",!user);
   document.getElementById("addPart").classList.toggle("hidden",!user);
-  // suppression réservée à l'admin (gérée par règles côté serveur — ici on cache juste le bouton si pas admin)
   document.getElementById("btnDelete").classList.toggle("hidden", false);
 }
-
+function setEditorVisible(v){
+  $("#editor").classList.toggle("hidden", !v);
+  $("#list").classList.toggle("hidden", v);
+  $("#empty").classList.toggle("hidden", v ? true : $("#list").children.length>0);
+}
 function closeEditor(){
   setEditorVisible(false);
   attachList();
@@ -383,36 +407,16 @@ async function deleteFiche(id){
   catch(e){ alert("Suppression refusée (réservée admin)."); }
 }
 
-/* ===== Boutons ===== */
-$("#btnNew").addEventListener("click", ()=>openEditor(null));
-$("#btnBack").addEventListener("click", closeEditor);
-$("#btnSave").addEventListener("click", saveFiche);
-$("#btnDelete").addEventListener("click", async ()=>{ if(currentId) await deleteFiche(currentId); });
-$("#btnPDF").addEventListener("click", ()=>window.print());
-$("#addPart").addEventListener("click", ()=>addPartRow());
-
 /* ===== Export JSON ===== */
-$("#btnExport").addEventListener("click", async ()=>{
+document.getElementById("btnExport").addEventListener("click", async ()=>{
   const snap = await db.collection('fiches').orderBy('createdAt','desc').get();
   const arr = snap.docs.map(d=>({id:d.id, ...d.data()}));
   const blob = new Blob([JSON.stringify(arr,null,2)], {type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="gcperf_fiches.json"; a.click(); URL.revokeObjectURL(a.href);
 });
 
-/* ===== Auth UI ===== */
-$("#btnLogin").addEventListener("click", ()=>$("#loginModal").classList.remove("hidden"));
-$("#loginCancel").addEventListener("click", ()=>$("#loginModal").classList.add("hidden"));
-$("#loginSubmit").addEventListener("click", async ()=>{
-  const email = document.getElementById("loginEmail").value.trim();
-  const pass  = document.getElementById("loginPass").value;
-  try{
-    await auth.signInWithEmailAndPassword(email, pass);
-    $("#loginModal").classList.add("hidden");
-    alert("Connecté !");
-  }catch(e){ console.error(e); alert("Erreur de connexion : " + (e.code || e.message)); }
-});
-$("#btnLogout").addEventListener("click", ()=>auth.signOut());
-
+/* ===== PDF ===== */
+document.getElementById("btnPDF").addEventListener("click", ()=> window.print());
 </script>
 </body>
 </html>
